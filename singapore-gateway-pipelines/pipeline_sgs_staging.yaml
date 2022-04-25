@@ -1,0 +1,86 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: deploy-singapore-gateway-staging
+spec:
+  params:
+  - name: clusterName
+    type: string
+    description: The name of the OSD cluster to create
+    default: "sgs-staging"
+  - name: clusterLifetime
+    type: string
+    description: The lifetime of the cluster
+    default: "168h"
+  tasks:
+  - name: fetch-repo-samples
+    params:
+    - name: url
+      value: https://github.com/stolostron/openshift-pipelines.git
+    - name: revision
+      value: main
+    - name: deleteExisting
+      value: "true"
+    - name: subdirectory
+      value: "samples"
+    - name: gitInitImage
+      value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:afc5d3f9efe26c7042635d43b8ffd09d67936e3d0b6b901dc08a33e20313d361
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+  - name: create-osd-cluster
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    - name: clusterLifetime
+      value: $(params.clusterLifetime)
+    taskRef:
+      kind: Task
+      name: singapore-gateway-deploy-osd-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-cluster-is-ready
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-ensure-cluster-is-ready
+    runAfter:
+      - create-osd-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: add-idp-to-cluster
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-ensure-cluster-idp
+    runAfter:
+      - ensure-cluster-is-ready
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: configure-cluster-staging
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    - name: clusterLifetime
+      value: "$(params.clusterLifetime)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-configure-staging-cluster
+    runAfter:
+      - add-idp-to-cluster
+      - fetch-repo-samples
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  workspaces:
+  - name: shared-workspace
