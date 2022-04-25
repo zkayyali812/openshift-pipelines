@@ -1,0 +1,34 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: singapore:gitopsservice
+rules:
+- apiGroups:
+  - "*"
+  resources:
+  - "*"
+  verbs:
+  - "*"
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: singapore:gitopsservice
+roleRef:
+  apiGroup: ""
+  kind: ClusterRole
+  name: singapore:gitopsservice
+subjects:
+- kind: ServiceAccount
+  name: cluster-registration-operator
+  namespace: cluster-registration-operator
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-registration-operator
+  namespace: cluster-registration-operator
