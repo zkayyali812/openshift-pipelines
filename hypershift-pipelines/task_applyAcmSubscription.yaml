@@ -1,0 +1,86 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-acm-hyper-apply-sub
+spec:
+  params:
+  - name: namespace
+    default: multicluster-engine
+    description: The namespace to deploy MCE into
+    type: string
+  - name: snapshot
+    default: 2.5.0-SNAPSHOT
+    description: The snapshot used to deploy MCE
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      oc project $(inputs.params.namespace)
+      _CHANNEL="release-$(echo $(inputs.params.snapshot) | cut -c1-3)"
+
+      existingCSV=$(oc get sub acm-operator-subscription -o yaml | yq eval '.status.currentCSV' -)
+      if [[ "$existingCSV" != "" ]]; then
+          echo "Existing ACM install exists"
+          echo $existingCSV
+          oc delete sub acm-operator-subscription || true
+          oc delete csv $existingCSV || true
+      else
+        echo "Existing ACM install does not exist"
+      fi
+
+      oc apply -f samples/hypershift-pipelines/resources/operatorgroup.yaml
+      oc patch og default --type=merge -p '{ "spec":  { "targetNamespaces" : ["$(inputs.params.namespace)"]}}'
+
+      _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: acm-operator-subscription
+      spec:
+        channel: ${_CHANNEL}
+        installPlanApproval: Automatic
+        name: advanced-cluster-management
+        source: acm-custom-registry
+        sourceNamespace: openshift-marketplace"
+      echo "$_TEMPLATE" | oc apply -f -
+
+      _ATTEMPTS=0
+      until oc get sub acm-operator-subscription -o jsonpath='{.status.currentCSV}' | grep -q "advanced";
+      do 
+          echo "Waiting for CSV..."
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          sleep 5;
+          if [[ $_ATTEMPTS == 5 ]]; then
+              echo "Failed to find the CSV in allotted time"
+              exit 1
+          fi
+      done
+
+      _CURRENT_CSV=$(oc get sub acm-operator-subscription -o jsonpath='{.status.currentCSV}')
+
+      _ATTEMPTS=0
+      until oc get csv ${_CURRENT_CSV} -ojsonpath='{.status.phase}' | grep "Succeeded";
+      do 
+          echo "Waiting for CSV to installation to complete..."
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          sleep 15;
+          if [[ $_ATTEMPTS == 10 ]]; then
+              echo "The CSV failed to install in the allotted time"
+              exit 1
+          fi
+      done
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

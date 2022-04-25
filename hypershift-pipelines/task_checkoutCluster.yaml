@@ -1,0 +1,85 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-acm-hyper-checkout-cluster
+spec:
+  params:
+  - name: clusterClaimName
+    default: demo-claim
+    description: The name of the clusterclaim to use
+    type: string
+  - name: clusterPoolName
+    default: policy-aas-hubs
+    description: The name of the clusterpool to use
+    type: string
+  - name: clusterClaimLifetime
+    default: "8h"
+    description: The length of the lifetime of the clusterclaim
+    type: string
+  results:
+  - name: username
+    description: Username for the claimed cluster.
+  - name: password
+    description: Password for the claimed cluster.  
+  - name: api
+    description: API URL of the claimed cluster.
+  - name: imagePullSecret
+    description: The imagePullSecret on the hub cluster.
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+      
+      _TEMPLATE="apiVersion: hive.openshift.io/v1
+      kind: ClusterClaim
+      metadata:
+        annotations:
+          cluster.open-cluster-management.io/createmanagedcluster: 'false'
+        name: $(inputs.params.clusterClaimName)
+      spec:
+        clusterPoolName: $(inputs.params.clusterPoolName)
+        lifetime: $(inputs.params.clusterClaimLifetime)
+        subjects:
+        - apiGroup: rbac.authorization.k8s.io
+          kind: Group
+          name: idp-for-the-masses
+        - apiGroup: rbac.authorization.k8s.io
+          kind: Group
+          name: system:serviceaccounts:managed-services"
+
+      echo "$_TEMPLATE" | oc apply -f -
+
+      oc wait --for=condition=ClusterRunning clusterclaim.hive/$(inputs.params.clusterClaimName) --timeout=90m
+
+      NAMESPACE=$(oc get clusterclaim.hive $(inputs.params.clusterClaimName) -o=jsonpath='{.spec.namespace}')
+      CD_INFO=$(oc get clusterdeployment ${NAMESPACE} -n ${NAMESPACE} -o yaml -o=jsonpath='{.spec.clusterMetadata.adminPasswordSecretRef.name}')
+      KUBECONFIG_SECRET=$(oc get cd ${NAMESPACE} -n ${NAMESPACE} -o yaml | yq eval '.spec.clusterMetadata.adminKubeconfigSecretRef.name' -)
+
+      _USERNAME=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.username}' | base64 -d )
+      _PASSWORD=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.password}' | base64 -d  )
+      _API_URL=$(oc get cd ${NAMESPACE} -n ${NAMESPACE} -o jsonpath='{.status.apiURL}' )
+      
+      oc get secret -n ${NAMESPACE} ${KUBECONFIG_SECRET} -o yaml | yq eval '.data.kubeconfig' - | base64 -d > $(inputs.params.clusterClaimName)-kubeconfig.yaml
+      
+      _IMAGE_PULL_SECRET=$(oc get secret hypershift-pipelines-multiclusterhub-operator-pull-secret -o yaml | yq eval '.data.".dockerconfigjson"' -)
+
+      echo "$_USERNAME" | tr -d '\n' > $(results.username.path)
+      echo "$_PASSWORD" | tr -d '\n' > $(results.password.path)
+      echo "$_API_URL" | tr -d '\n' > $(results.api.path)
+      echo "$_IMAGE_PULL_SECRET" | tr -d '\n' > $(results.imagePullSecret.path)
+
+      echo "API URL of claimed cluster: $_API_URL"
+      echo "Password for the claimed cluster: $_PASSWORD"
+      echo ""
+      echo "Clusterclaim successfully checked out"
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

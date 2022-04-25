@@ -1,0 +1,104 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-acm-hyper-apply-hyper-deployment
+spec:
+  params:
+  - name: targetManagedCluster
+    default: local-cluster
+    description: The managedcluster to target to become a managementcluster
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      HYPERSHIFT_CREDS=$(oc get secret hypershift-pipelines-hypershift-operator-oidc-provider-s3-credentials -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "hypershift-operator-oidc-provider-s3-credentials"' -)
+      ACM_CREDS=$(oc get secret hypershift-pipelines-acm-creds  -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "acm-credentials"' -)
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      echo "$HYPERSHIFT_CREDS" | oc apply -f - -n $(inputs.params.targetManagedCluster)
+      echo "$ACM_CREDS" | oc apply -f - -n $(inputs.params.targetManagedCluster)
+
+      echo "Applying HyperShift ManagedClusterAddon ..."
+      oc apply -f samples/hypershift-pipelines/resources/hypershift-addon.yaml -n $(inputs.params.targetManagedCluster)
+      
+      echo "Waiting for pod to be available"
+      sleep 60
+
+      oc project multicluster-engine
+      oc create ns clusters || true
+      _TEMPLATE="apiVersion: cluster.open-cluster-management.io/v1alpha1
+      kind: HypershiftDeployment
+      metadata:
+        name: $(inputs.params.targetManagedCluster)-hd
+        namespace: $(inputs.params.targetManagedCluster)
+      spec:
+        hostingCluster: $(inputs.params.targetManagedCluster)
+        hostingNamespace: $(inputs.params.targetManagedCluster)
+        infrastructure:
+          cloudProvider:
+            name: acm-credentials
+          configure: True
+          platform:
+            aws:
+              region: us-east-2"
+      echo "$_TEMPLATE" | oc apply -f -
+
+      if [[ "$(inputs.params.targetManagedCluster)" == "local-cluster" ]]; then
+        _ATTEMPTS=0
+        until oc get hostedcluster $(inputs.params.targetManagedCluster)-hd -n $(inputs.params.targetManagedCluster);
+        do 
+            echo "$_ATTEMPTS/10: Waiting for HostedCluster to be deployed from HyperShiftDeployment"
+            _ATTEMPTS=$((_ATTEMPTS + 1))
+            sleep 15;
+            if [[ $_ATTEMPTS == 10 ]]; then
+                echo "The hostedcluster did not come up in the allotted time"
+                exit 1
+            fi
+        done
+        echo "Validating HostedCluster on hub cluster 'local-cluster' ..."
+        _ATTEMPTS=0
+        echo "Waiting for HostedCluster deployment to complete ..."
+        until oc get hostedcluster -n $(inputs.params.targetManagedCluster) $(inputs.params.targetManagedCluster)-hd -o yaml | yq eval '.status.version.history.[0].state' - | grep "Completed";
+        do 
+            echo "$_ATTEMPTS/30: Waiting for HostedCluster deployment to be complete... Sleeping 1 min"
+            _ATTEMPTS=$((_ATTEMPTS + 1))
+            sleep 60;
+            if [[ $_ATTEMPTS == 30 ]]; then
+                echo "The hostedcluster not come up in the allotted time"
+                exit 1
+            fi
+        done
+        echo "HostedCluster is running on hub cluster 'local-cluster'"
+      fi
+
+      echo "Validating HostedCluster created ManagedCluster on hub cluster ..."
+        _ATTEMPTS=0
+        echo "Waiting for ManagedCluster to be created ..."
+        until oc get managedcluster | grep "$(inputs.params.targetManagedCluster)-hd";
+        do 
+            echo "$_ATTEMPTS/10: Waiting for HostedCluster ManagedCluster to be available... Sleeping 1 min"
+            _ATTEMPTS=$((_ATTEMPTS + 1))
+            sleep 60;
+            if [[ $_ATTEMPTS == 10 ]]; then
+                echo "The managedcluster not come up in the allotted time"
+                exit 1
+            fi
+        done
+        echo "ManagedCluster is running on hub cluster"
+
+      echo "HyperShiftDeployment deployed successfully"
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

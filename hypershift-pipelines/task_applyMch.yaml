@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-acm-hyper-apply-mch
+spec:
+  params:
+  - name: namespace
+    default: open-cluster-management
+    description: The namespace to deploy MCE into
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+      oc project $(inputs.params.namespace)
+
+      oc apply -f samples/hypershift-pipelines/resources/multiclusterhub.yaml
+
+      _ATTEMPTS=0
+      until oc get mch multiclusterhub -o jsonpath={'.status.phase'} | grep "Running";
+      do 
+          echo "Waiting for MCH to enter a Running state..."
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          sleep 15;
+          if [[ $_ATTEMPTS == 30 ]]; then
+              echo "Failed to install the MCH in allotted time"
+              exit 1
+          fi
+      done
+
+      echo "MultiClusterHub is running"
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

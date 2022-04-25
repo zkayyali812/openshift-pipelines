@@ -1,0 +1,188 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: deploy-downstream-acm-and-hypershift-deployment
+spec:
+  params:
+  - name: clusterPoolName
+    type: string
+    description: The name of the clusterpool to use
+    default: "hypershift-cluster-pool"
+  - name: clusterClaimName
+    type: string
+    description: The name of the clusterclaim to claim
+    default: "spoke-cluster"
+  - name: clusterClaimLifetime
+    type: string
+    description: The length of the lifetime of the clusterclaim. Default 8h
+    default: "8h"
+  - name: namespace
+    type: string
+    description: The namespace to deploy ACM onto the target cluster
+    default: "open-cluster-management"
+  - name: snapshot
+    type: string
+    description: The downstream SNAPSHOT to used to deploy ACM
+    default: "2.0-latest"
+  tasks:
+  - name: fetch-repo-samples
+    params:
+    - name: url
+      value: https://github.com/stolostron/openshift-pipelines.git
+    - name: revision
+      value: main
+    - name: deleteExisting
+      value: "true"
+    - name: subdirectory
+      value: "samples"
+    - name: gitInitImage
+      value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:afc5d3f9efe26c7042635d43b8ffd09d67936e3d0b6b901dc08a33e20313d361
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+  - name: validate-parameters
+    params:
+    - name: clusterPoolName
+      value: $(params.clusterPoolName)
+    - name: clusterClaimLifetime
+      value: $(params.clusterClaimLifetime)
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-param-validation
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: checkout-hub-cluster
+    params:
+    - name: clusterClaimName
+      value: $(params.clusterClaimName)
+    - name: clusterPoolName
+      value: $(params.clusterPoolName)
+    - name: clusterClaimLifetime
+      value: $(params.clusterClaimLifetime)
+    runAfter:
+    - fetch-repo-samples
+    - validate-parameters
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-checkout-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: login-to-hub-cluster
+    params:
+    - name: username
+      value: "$(tasks.checkout-hub-cluster.results.username)"
+    - name: password
+      value: "$(tasks.checkout-hub-cluster.results.password)"
+    - name: api
+      value: "$(tasks.checkout-hub-cluster.results.api)"
+    runAfter:
+    - checkout-hub-cluster
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-login-to-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: checkout-spoke-cluster
+    params:
+    - name: clusterClaimName
+      value: $(params.clusterClaimName)-spoke
+    - name: clusterPoolName
+      value: $(params.clusterPoolName)
+    - name: clusterClaimLifetime
+      value: $(params.clusterClaimLifetime)
+    runAfter:
+    - login-to-hub-cluster
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-checkout-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-acm-prereqs
+    params:
+    - name: namespace
+      value: "$(params.namespace)"
+    - name: snapshot
+      value: "$(params.snapshot)"
+    - name: imagePullSecret
+      value: "$(tasks.checkout-hub-cluster.results.imagePullSecret)"
+    runAfter:
+    - login-to-hub-cluster
+    taskRef:
+      kind: Task
+      name: deploy-ds-acm-hyper-prereqs
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-acm
+    params:
+    - name: namespace
+      value: $(params.namespace)
+    - name: snapshot
+      value: "$(params.snapshot)"
+    runAfter:
+    - ensure-acm-prereqs
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-apply-sub
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-mch
+    params:
+    - name: namespace
+      value: $(params.namespace)
+    runAfter:
+    - ensure-acm
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-apply-mch
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: import-spoke-cluster
+    params:
+    - name: clusterClaimName
+      value: $(params.clusterClaimName)-spoke
+    runAfter:
+    - ensure-mch
+    - checkout-spoke-cluster
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-import-spoke
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-hypershiftdeployment-hub
+    params:
+    - name: targetManagedCluster
+      value: local-cluster
+    runAfter:
+    - ensure-mch
+    - import-spoke-cluster
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-apply-hyper-deployment
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-hypershiftdeployment-spoke
+    params:
+    - name: targetManagedCluster
+      value: $(params.clusterClaimName)-spoke
+    runAfter:
+    - import-spoke-cluster
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-apply-hyper-deployment
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  workspaces:
+  - name: shared-workspace

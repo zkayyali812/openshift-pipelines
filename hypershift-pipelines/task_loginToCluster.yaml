@@ -1,0 +1,39 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-acm-hyper-login-to-cluster
+spec:
+  params:
+  - name: username
+    default: kubeadmin
+    description: The username of the claimed cluster
+    type: string
+  - name: password
+    default: password
+    description: The password of the claimed cluster
+    type: string
+  - name: api
+    default: https://api.openshift.com
+    description: The claimed cluster API URL
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+      
+      LOGINCMD="oc login $(inputs.params.api) -u $(inputs.params.username) -p $(inputs.params.password) --insecure-skip-tls-verify=true"
+      eval $LOGINCMD
+      
+      echo $LOGINCMD > login.sh
+      echo $LOGINCMD
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
