@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: cleanup-acm-and-hypershift-deployment
+spec:
+  params:
+  - name: clusterClaimName
+    type: string
+    description: The name of the clusterclaim to claim
+    default: "spoke-cluster"
+  tasks:
+  - name: checkout-hub-cluster
+    params:
+    - name: clusterClaimName
+      value: $(params.clusterClaimName)
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-checkout-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: login-to-hub-cluster
+    params:
+    - name: username
+      value: "$(tasks.checkout-hub-cluster.results.username)"
+    - name: password
+      value: "$(tasks.checkout-hub-cluster.results.password)"
+    - name: api
+      value: "$(tasks.checkout-hub-cluster.results.api)"
+    runAfter:
+    - checkout-hub-cluster
+    taskRef:
+      kind: Task
+      name: deploy-acm-hyper-login-to-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: clean-up-resources
+    params:
+    - name: clusterClaimName
+      value: $(params.clusterClaimName)
+    taskRef:
+      kind: Task
+      name: cleanup-acm-hypershift-resources
+    runAfter:
+      - login-to-hub-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: clean-up-clusters
+    params:
+    - name: clusterClaimName
+      value: $(params.clusterClaimName)
+    taskRef:
+      kind: Task
+      name: cleanup-acm-hypershift-clusters
+    runAfter:
+      - clean-up-resources
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  workspaces:
+  - name: shared-workspace

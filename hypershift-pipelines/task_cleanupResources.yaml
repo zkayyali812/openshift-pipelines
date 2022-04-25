@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup-acm-hypershift-resources
+spec:
+  params:
+  - name: clusterClaimName
+    default: demo-claim
+    description: The name of the clusterclaim to use
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+      
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+      
+      echo "Cleaning up ACM and hypershift deployments"
+      oc project
+
+      echo "Cleaning up the hypershift deployments below"
+      oc get hypershiftdeployments -A
+      oc delete hypershiftdeployments --all -A
+
+      _SPOKE_CLUSTER_NAME=$(inputs.params.clusterClaimName)-spoke
+      echo "Detaching the the spoke cluster $_SPOKE_CLUSTER_NAME"
+      oc delete managedcluster $_SPOKE_CLUSTER_NAME || true
+
+      echo "Deleting MultiClusterHub ..."
+      oc delete mch --all -A
+
+      echo "HyperShift and hub resources successfully deleted"
+      exit 0
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

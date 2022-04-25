@@ -1,0 +1,21 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterPool
+metadata:
+  name: hypershift-cluster-pool
+  namespace: <CLUSTERPOOL_NAMESPACE>
+  labels:
+    cluster.open-cluster-management.io/clusterset: <CLUSTER_SET> # If available
+spec:
+  baseDomain: <BASE_DOMAIN> # Ensure proper basedomain
+  imageSetRef:
+    name: img4.10.6-x86-64 # ImageSet must exist in cluster
+  installConfigSecretTemplateRef:
+    name: hypershift-cluster-pool-install-config # See installConfigSecret
+  platform:
+    aws:
+      credentialsSecretRef:
+        name: <AWS_CREDENTIALS_SECRET>
+      region: <REGION><
+  pullSecretRef:
+    name: <OCP_PULL_SECRET>
+  size: 2

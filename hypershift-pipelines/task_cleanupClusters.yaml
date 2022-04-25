@@ -1,0 +1,35 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup-acm-hypershift-clusters
+spec:
+  params:
+  - name: clusterClaimName
+    default: demo-claim
+    description: The name of the clusterclaim to use
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _SPOKE_CLUSTER_NAME=$(inputs.params.clusterClaimName)-spoke
+      echo "Deleting spoke clusterclaim: $_SPOKE_CLUSTER_NAME"
+      oc delete clusterclaim.hive $_SPOKE_CLUSTER_NAME || true
+
+      echo "Deleting hub clusterclaim: $(inputs.params.clusterClaimName)"
+      oc delete clusterclaim.hive  $(inputs.params.clusterClaimName) || true
+
+      echo "Clusterclaims successfully deleted"
+      exit 0
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
