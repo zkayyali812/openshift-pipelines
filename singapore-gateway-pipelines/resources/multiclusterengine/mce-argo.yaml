@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     path: singapore-gateway-pipelines/resources/operators/multicluster-engine
-    repoURL: 'https://github.com/stolostron/pipeline-samples.git'
+    repoURL: 'https://github.com/stolostron/openshift-pipelines.git'
     targetRevision: main
   syncPolicy:
     automated:

@@ -1,0 +1,53 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-acm-hyper-param-validation
+spec:
+  params:
+  - name: clusterPoolName
+    default: ""
+    description: The namespace to search for the clusterpool
+    type: string
+  - name: clusterClaimLifetime
+    default: ""
+    description: The length of the lifetime of the clusterclaim
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      # Validate Clusterpool exists
+      # Validate clusterClaimLifetime ends in 'h'
+      # Validates imagePullSecretExists
+
+
+      echo "For help with script see instrctions- https://github.com/zkayyali812/pipeline-samples"
+
+      oc get clusterpool $(inputs.params.clusterPoolName)
+      if [[ $? == 0 ]]; then
+        echo "Clusterpool exists"
+      else
+        echo "Unable to locate clusterpool: $(inputs.params.clusterPoolName)"
+        exit 1
+      fi
+
+      _CLUSTERCLAIMLIFETIME=$(inputs.params.clusterClaimLifetime)
+      if [[ "${_CLUSTERCLAIMLIFETIME: -1}" == 'h' ]]; then
+        echo "ClusterClaimLifetime is valid"
+      else
+        echo "clusterClaimLifetime must end in 'h'"
+        exit 1
+      fi
+      
+      echo "Params are valid"
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

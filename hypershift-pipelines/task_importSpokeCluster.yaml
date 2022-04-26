@@ -1,0 +1,58 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-acm-hyper-import-spoke
+spec:
+  params:
+  - name: clusterClaimName
+    default: demo-claim
+    description: The name of the clusterclaim to use
+    type: string
+  results:
+  - name: username
+    description: Username for the claimed cluster.
+  - name: password
+    description: Password for the claimed cluster.  
+  - name: api
+    description: API URL of the claimed cluster.
+  - name: imagePullSecret
+    description: The imagePullSecret on the hub cluster.
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+      
+      echo "# Copyright Contributors to the Open Cluster Management project
+      managedCluster:
+        name: ""
+        addons:
+          applicationManager:
+            enabled: false
+            argocdCluster: false
+          policyController:
+            enabled: true
+          searchCollector:
+            enabled: false
+          certPolicyController:
+            enabled: false
+          iamPolicyController:
+            enabled: false
+        autoImportRetry: 5" > spokevalues.yaml
+
+      cm attach cluster --cluster $(inputs.params.clusterClaimName) --cluster-kubeconfig $(inputs.params.clusterClaimName)-kubeconfig.yaml --values spokevalues.yaml
+
+      echo "Spoke cluster successfully imported"
+      exit 0 
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
