@@ -7,6 +7,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   displayName: MultiCluster Engine
-  image: quay.io:443/acm-d/mce-custom-registry:2.5.0-DOWNSTREAM-2022-03-29-05-04-50
+  image: quay.io:443/acm-d/mce-custom-registry:2.5.0-DOWNSTREAM-2022-04-26-10-05-22
   publisher: Red Hat
   sourceType: grpc
