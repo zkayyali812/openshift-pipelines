@@ -9,4 +9,4 @@ spec:
   overrides:
     components:
       - enabled: true
-        name: managed-service-account
+        name: managedserviceaccount-preview
