@@ -106,27 +106,27 @@ spec:
           fi
       done 
 
-      # oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=globalpullsecret.yaml
+      oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=globalpullsecret.yaml
 
       # echo "Applying ICSP ..."
 
-      # _TEMPLATE="apiVersion: operator.openshift.io/v1alpha1
-      # kind: ImageContentSourcePolicy
-      # metadata:
-      #   annotations:
-      #   name: rhacm-repo
-      # spec:
-      #   repositoryDigestMirrors:
-      #   - mirrors:
-      #     - quay.io:443/acm-d
-      #     source: registry.redhat.io/rhacm2
-      #   - mirrors:
-      #     - quay.io:443/acm-d
-      #     source: registry.redhat.io/multicluster-engine
-      #   - mirrors:
-      #     - registry.redhat.io/openshift4/ose-oauth-proxy
-      #     source: registry.access.redhat.com/openshift4/ose-oauth-proxy"
-      # echo "$_TEMPLATE" | oc apply -f -
+      _TEMPLATE="apiVersion: operator.openshift.io/v1alpha1
+      kind: ImageContentSourcePolicy
+      metadata:
+        annotations:
+        name: rhacm-repo
+      spec:
+        repositoryDigestMirrors:
+        - mirrors:
+          - quay.io:443/acm-d
+          source: registry.redhat.io/rhacm2
+        - mirrors:
+          - quay.io:443/acm-d
+          source: registry.redhat.io/multicluster-engine
+        - mirrors:
+          - registry.redhat.io/openshift4/ose-oauth-proxy
+          source: registry.access.redhat.com/openshift4/ose-oauth-proxy"
+      echo "$_TEMPLATE" | oc apply -f -
       echo ""
       echo "Applying OpenShift GitOps ..."
       
