@@ -4,14 +4,10 @@ metadata:
   name: deploy-singapore-gateway-production
 spec:
   params:
-  - name: apiURL
+  - name: clusterName
     type: string
-    description: The API URL of the cluster to log into
-    default: "https://api.prod-cluster.endpoint.osd.openshiftapps.com:6443"
-  - name: token
-    type: string
-    description: The token of the account to login to cluster with
-    default: "token"
+    description: The name of the OSD cluster to create
+    default: "sgs-staging"
   tasks:
   - name: fetch-repo-samples
     params:
@@ -31,31 +27,50 @@ spec:
     workspaces:
     - name: output
       workspace: shared-workspace
-  - name: login-to-cluster
+  - name: create-osd-cluster
     params:
-    - name: apiURL
-      value: $(params.apiURL)
-    - name: token
-      value: $(params.token)
+    - name: clusterName
+      value: "$(params.clusterName)"
     taskRef:
       kind: Task
-      name: singapore-gateway-login-to-cluster
-    runAfter:
-    - fetch-repo-samples
+      name: singapore-gateway-deploy-prod-osd-cluster
     workspaces:
-      - name: source
-        workspace: shared-workspace
-  - name: configure-cluster-prod
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-cluster-is-ready
     params:
-    - name: apiURL
-      value: $(params.apiURL)
-    - name: token
-      value: $(params.token)
+    - name: clusterName
+      value: "$(params.clusterName)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-ensure-prod-cluster-is-ready
+    runAfter:
+      - create-osd-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: add-idp-to-cluster
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-ensure-prod-cluster-idp
+    runAfter:
+      - ensure-cluster-is-ready
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: configure-cluster-staging
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
     taskRef:
       kind: Task
       name: singapore-gateway-configure-prod-cluster
     runAfter:
-      - login-to-cluster
+      - add-idp-to-cluster
+      - fetch-repo-samples
     workspaces:
     - name: source
       workspace: shared-workspace
