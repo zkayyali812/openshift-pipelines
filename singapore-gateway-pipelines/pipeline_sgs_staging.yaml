@@ -39,7 +39,7 @@ spec:
       value: $(params.clusterLifetime)
     taskRef:
       kind: Task
-      name: singapore-gateway-deploy-osd-cluster
+      name: singapore-gateway-deploy-staging-osd-cluster
     workspaces:
     - name: source
       workspace: shared-workspace
@@ -49,7 +49,7 @@ spec:
       value: "$(params.clusterName)"
     taskRef:
       kind: Task
-      name: singapore-gateway-ensure-cluster-is-ready
+      name: singapore-gateway-ensure-staging-cluster-is-ready
     runAfter:
       - create-osd-cluster
     workspaces:
@@ -61,7 +61,7 @@ spec:
       value: "$(params.clusterName)"
     taskRef:
       kind: Task
-      name: singapore-gateway-ensure-cluster-idp
+      name: singapore-gateway-ensure-staging-cluster-idp
     runAfter:
       - ensure-cluster-is-ready
     workspaces:

@@ -1,45 +1,65 @@
 
-# PROD: Create a production OSD cluster
+# PRODUCTION: Create a production OSD cluster
 
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: singapore-gateway-login-to-cluster
+  name: singapore-gateway-deploy-prod-osd-cluster
 spec:
   params:
-  - name: apiURL
+  - name: clusterName
     default: ""
-    description: The API URL of the cluster to log into
-    type: string
-  - name: token
-    default: ""
-    description: The token of the account to login to cluster with
+    description: The name of the OSD cluster to create
     type: string
   steps:
   - args:
     - |-
       #!/bin/bash
       set -e
-      set -x
 
-      _API_URL=$(params.apiURL)
-      _TOKEN=$(params.token)
+      _CLUSTER_NAME="$(params.clusterName)"
 
-      echo "Attempting to login to cluster at $_API_URL"
-      _ATTEMPTS=0
-      echo ""
-      until oc login --token "${_TOKEN}" --server "${_API_URL}";
-      do 
-          echo "$_ATTEMPTS/30: Attempting to login to cluster ..."
-          _ATTEMPTS=$((_ATTEMPTS + 1))
-          sleep 60;
-          if [[ $_ATTEMPTS == 30 ]]; then
-              echo "Unable to login to cluster in the allotted time"
-              exit 1
-          fi
-      done
+      echo "Authenticating with secret 'singapore-gateway-ocm-credentials'"
+      _OCM_TOKEN=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.ocmToken' - | base64 -d)
+      ocm login --token ${_OCM_TOKEN}
+      echo "Logged in to OCM"
 
-      echo "Successfully logged into cluster"     
+      echo "Checking if cluster '${_CLUSTER_NAME}' exists"
+
+      _CLUSTER_ID=$(ocm describe cluster ${_CLUSTER_NAME} --json | jq '.id')
+      _CLUSTER_ID=${_CLUSTER_ID//[[:blank:]]/}
+
+      if [ "${_CLUSTER_ID}" != "" ]; then
+        echo "Cluster '${_CLUSTER_NAME}' already exists"
+        exit 0
+      fi
+
+      echo "Creating OSD cluster '${_CLUSTER_NAME}'"
+
+      _awsAccountID=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.awsAccountID' - | base64 -d)
+      _awsAccessKeyID=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.awsAccessKeyID' - | base64 -d)
+      _awsSecretAccessKey=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.awsSecretAccessKey' - | base64 -d)
+      _ocpVersion=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.ocpVersion' - | base64 -d)
+      _provider=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.provider' - | base64 -d)
+      _region=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.region' - | base64 -d)
+      _min_Replicas=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.nodesMin' - | base64 -d)
+      _max_Replicas=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.nodesMax' - | base64 -d)
+      _compute_Nodes=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.computeNodes' - | base64 -d)
+
+      ocm create cluster ${_CLUSTER_NAME} \
+        --aws-account-id ${_awsAccountID} \
+        --aws-access-key-id ${_awsAccessKeyID} \
+        --aws-secret-access-key ${_awsSecretAccessKey} \
+        --ccs \
+        --version ${_ocpVersion} \
+        --provider ${_provider} \
+        --region ${_region} \
+        --compute-nodes ${_compute_Nodes} \
+        --etcd-encryption
+
+      ocm list clusters
+
+      echo "Cluster created"
       exit 0
 
     command:
@@ -54,21 +74,69 @@ spec:
 
 ---
 
-# PROD: Configure OSD cluster 
+# PRODUCTION: Ensures OSD Cluster is running
 
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: singapore-gateway-configure-prod-cluster
+  name: singapore-gateway-ensure-prod-cluster-is-ready
 spec:
   params:
-  - name: apiURL
+  - name: clusterName
     default: ""
-    description: The API URL of the cluster to log into
+    description: The name of the OSD cluster to create
     type: string
-  - name: token
+
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _CLUSTER_NAME="$(params.clusterName)"
+
+      echo "Authenticating with secret 'singapore-gateway-ocm-credentials'"
+      _OCM_TOKEN=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.ocmToken' - | base64 -d)
+      ocm login --token ${_OCM_TOKEN}
+      echo "Logged in to OCM"
+
+      echo "Waiting up to 1 hour for cluster to be running"
+      _ATTEMPTS=0
+      until ocm describe cluster ${_CLUSTER_NAME} --json | jq -r '.status.state' | grep -q "ready";
+      do 
+          echo "Attempt ${_ATTEMPTS}/60. Cluster currently in state: $(ocm describe cluster ${_CLUSTER_NAME} --json | jq -r '.status.state')"
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          sleep 60;
+          if [[ $_ATTEMPTS == 60 ]]; then
+              echo "Failed to find the CSV in allotted time"
+              exit 1
+          fi
+      done
+      echo "Cluster is running"
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+# PRODUCTION: Create IDP Access to cluster. HTPasswd and Github.
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: singapore-gateway-ensure-prod-cluster-idp
+spec:
+  params:
+  - name: clusterName
     default: ""
-    description: The token of the account to login to cluster with
+    description: The name of the OSD cluster to create
     type: string
   steps:
   - args:
@@ -76,13 +144,114 @@ spec:
       #!/bin/bash
       set -e
 
-      _API_URL=$(params.apiURL)
-      _TOKEN=$(params.token)
+      _CLUSTER_NAME="$(params.clusterName)"
 
-      echo "Attempting to login to cluster at $_API_URL"
+      echo "Authenticating with secret 'singapore-gateway-ocm-credentials'"
+      _OCM_TOKEN=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.ocmToken' - | base64 -d)
+      ocm login --token ${_OCM_TOKEN}
+      echo "Logged in to OCM"
+
+      _CLUSTER_ADMIN_USER=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.clusterAdminUser' - | base64 -d)
+      _CLUSTER_ADMIN_PASS=$(head /dev/urandom | LC_CTYPE=C tr -dc A-Za-z0-9 | head -c 80 ; echo '')
+      if [[ -z "${_CLUSTER_ADMIN_USER}" ]]; then
+        echo "Cluster admin user not found in secret 'singapore-gateway-ocm-credentials'"
+        exit 1
+      fi
+
+      _IDP=$(ocm list idp --cluster ${_CLUSTER_NAME})
+
+      if echo "$_IDP" | grep -q "htpasswd"; then
+          echo "htpasswd authentication already configured"
+      else
+        oc delete secret singapore-gateway-ocm-credentials-${_CLUSTER_NAME} || true
+        oc create secret generic singapore-gateway-ocm-credentials-${_CLUSTER_NAME} \
+        --from-literal=username=${_CLUSTER_ADMIN_USER} \
+        --from-literal=password=${_CLUSTER_ADMIN_PASS}
+
+        # Create bot authentication
+        while ! ocm create idp --cluster=${_CLUSTER_NAME} --type htpasswd --name htpasswd --username ${_CLUSTER_ADMIN_USER} --password ${_CLUSTER_ADMIN_PASS}
+        do
+            printf "Waiting for cluster to become active...\n"
+            sleep 30
+        done
+
+        ocm create user ${_CLUSTER_ADMIN_USER} --cluster=${_CLUSTER_NAME} --group=cluster-admins || true
+        ocm create user ${_CLUSTER_ADMIN_USER} --cluster=${_CLUSTER_NAME} --group=dedicated-admins || true
+      fi
+
+      # if echo "$_IDP" | grep -q "GitHub"; then
+      #   echo "GitHub authentication already configured"
+      # else
+      #   # Create user authentication
+      #   _IDP_GH_TEAMS=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.idpGithubTeams' - | base64 -d)
+      #   _IDP_ClientID=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.idpClientID' - | base64 -d)
+      #   _IDP_ClientSecret=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.idpClientSecret' - | base64 -d)
+
+      #   ocm create idp --cluster=${_CLUSTER_NAME} \
+      #     --type github \
+      #     --name GitHub \
+      #     --teams ${_IDP_GH_TEAMS} \
+      #     --client-id ${_IDP_ClientID} \
+      #     --client-secret ${_IDP_ClientSecret}
+      # fi
+      
+      _IDP_GITHUB_ADMINS=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.idpGithubAdmins' - | base64 -d)
+      for IDP_USER in ${_IDP_GITHUB_ADMINS//,/ }
+      do
+        ocm create user ${IDP_USER} --cluster=${_CLUSTER_NAME} --group=cluster-admins || true
+        ocm create user ${IDP_USER} --cluster=${_CLUSTER_NAME} --group=dedicated-admins || true
+      done
+      
+      echo "IDP Created... Be sure to update IDP callback URL in GitHub Oauth settings"
+
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+# PRODUCTION: Configure OSD cluster 
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: singapore-gateway-configure-prod-cluster
+spec:
+  params:
+  - name: clusterName
+    default: ""
+    description: The name of the OSD cluster to create
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _CLUSTER_NAME="$(params.clusterName)"
+
+      echo "Authenticating with secret 'singapore-gateway-ocm-credentials'"
+      _OCM_TOKEN=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.ocmToken' - | base64 -d)
+      _GLOBAL_PULL_SECRET=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.globalPullSecret' - | base64 -d)
+      echo $_GLOBAL_PULL_SECRET > globalpullsecret.yaml
+
+      ocm login --token ${_OCM_TOKEN}
+      echo "Logged in to OCM"
+      echo ""
+
+      ADMIN_USER=$(oc get secret singapore-gateway-ocm-credentials -o yaml | yq eval '.data.clusterAdminUser' - | base64 -d)
+      ADMIN_PASS=$(oc get secret singapore-gateway-ocm-credentials-${_CLUSTER_NAME} -o yaml | yq eval '.data.password' - | base64 -d)
+
       _ATTEMPTS=0
       echo ""
-      until oc login --token "${_TOKEN}" --server "${_API_URL}";
+      until echo ${ADMIN_PASS} | ocm cluster login ${_CLUSTER_NAME} -u ${ADMIN_USER};
       do 
           echo "$_ATTEMPTS/30: Attempting to login to cluster ..."
           _ATTEMPTS=$((_ATTEMPTS + 1))
@@ -92,6 +261,8 @@ spec:
               exit 1
           fi
       done
+
+      sleep 30
 
       _ATTEMPTS=0
       echo ""
@@ -108,7 +279,7 @@ spec:
 
       oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=globalpullsecret.yaml
 
-      # echo "Applying ICSP ..."
+      echo "Applying ICSP ..."
 
       _TEMPLATE="apiVersion: operator.openshift.io/v1alpha1
       kind: ImageContentSourcePolicy
