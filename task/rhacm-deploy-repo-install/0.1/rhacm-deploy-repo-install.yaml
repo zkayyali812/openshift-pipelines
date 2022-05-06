@@ -1,0 +1,58 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rhacm-deploy-repo-install
+spec:
+  workspaces:
+  - name: source
+  params:
+  - name: SNAPSHOT
+    default: '2.5.0-DOWNSTREAM-2022-05-04-22-48-12'
+    description: Snapshot version number, required
+    type: string  
+  - name: API_ENDPOINT
+    default: 'https://api.example.domain.com:6443'
+    description: k8s endpoint url
+    type: string
+  - name: GITOPS_SECRET_NAME
+    default: 'gitops-secret'
+    description: Name of the secret that contains credentials
+    type: string
+  steps:
+  - args:
+    - |-
+      _TOKEN_RAW=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.ocpTokenEncoded}' | base64 --decode | base64 --decode)
+      _PS=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.globalPullSecretEncoded}' | base64 --decode | tr -d '"')
+      
+      export KUBECONFIG=/tmp/local-kubeconfig
+      oc login --token=$_TOKEN_RAW --server=$(params.API_ENDPOINT) --insecure-skip-tls-verify=true
+      oc cluster-info
+
+      cat > ./prereqs/pull-secret.yaml <<EOF
+      apiVersion: v1
+      data:
+        .dockerconfigjson: $_PS
+      kind: Secret
+      metadata:
+        name: multiclusterhub-operator-pull-secret
+        namespace: open-cluster-management
+      type: kubernetes.io/dockerconfigjson
+      EOF
+
+      cat > ./snapshot.ver <<EOF
+      $(params.SNAPSHOT)
+      EOF
+
+      export COMPOSITE_BUNDLE=true
+      export CUSTOM_REGISTRY_REPO="quay.io:443/acm-d"
+
+      ./start.sh
+
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source

@@ -1,1 +1,5 @@
 **/secrets.yaml
+.history
+*/**/.history
+.prereq
+*/**/.prereq
