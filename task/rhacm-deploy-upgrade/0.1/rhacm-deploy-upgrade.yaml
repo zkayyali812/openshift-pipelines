@@ -1,0 +1,181 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rhacm-deploy-upgrade
+spec:
+  workspaces:
+  - name: source
+  params:
+  - name: SNAPSHOT
+    default: '2.5.0-DOWNSTREAM-2022-05-04-22-48-12'
+    description: Snapshot version number, required
+    type: string  
+  - name: API_ENDPOINT
+    default: 'https://api.example.domain.com:6443'
+    description: k8s endpoint url
+    type: string
+  - name: GITOPS_SECRET_NAME
+    default: 'gitops-encoded'
+    description: Name of the secret that contains credentials
+    type: string
+  steps:
+  - args:
+    - |-
+      _TOKEN_RAW=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.ocpTokenEncoded}' | base64 --decode | base64 --decode)
+      _PS=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.globalPullSecretEncoded}' | base64 --decode)
+      
+      export KUBECONFIG=/tmp/local-kubeconfig
+      oc login --token=$_TOKEN_RAW --server=$(params.API_ENDPOINT) --insecure-skip-tls-verify=true
+      oc cluster-info
+
+      echo "Start Updating ACM/MCE ..."
+      echo ""
+
+      echo "Verify connection and Multicluster Engine is present."
+      out=`oc get mce multiclusterengine 2>&1`
+      if [ $? -ne 0 ]; then
+        echo "Did not find the resource multiclusterengine-sample. Make sure you are connected to the correct OpenShift."
+        printf "\n${out}\n"
+        exit 1
+      fi
+
+      # Support running the script while connected to the cluster as "snapshot=backplane-2.0-XX-YY-ZZ && ./upgrade.sh"
+      if [ "$(params.SNAPSHOT)" == "" ]; then
+        echo "No snapshot provided"
+        exit 1
+      fi
+
+      echo "Verify acm-custom-registry in openshift-marketplace."
+      oc get -n openshift-marketplace catalogsource acm-custom-registry > /dev/null 2>&1
+      if [ $? -ne 0 ]; then
+        echo "catalogSource is misisng"
+        exit 1
+      fi
+
+      echo "Verify multiclusterengine-catalog in openshift-marketplace."
+      oc get -n openshift-marketplace catalogsource multiclusterengine-catalog > /dev/null 2>&1
+      if [ $? -ne 0 ]; then
+        echo "catalogSource is misisng"
+        exit 1
+      fi
+
+      echo "Deploying a new ACM Catalog Source."
+      oc apply -f - <<EOF
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: CatalogSource
+      metadata:
+        name: acm-custom-registry
+        namespace: openshift-marketplace
+      spec:
+        displayName: Advanced Cluster Management
+        image: quay.io:443/acm-d/acm-custom-registry:$(params.SNAPSHOT)
+        publisher: Red Hat
+        secrets:
+        - multiclusterhub-operator-pull-secret
+        sourceType: grpc
+        updateStrategy:
+          registryPoll:
+            interval: 10m
+      EOF
+      if [ $? -ne 0 ]; then
+        echo "Error when attempting to update the acm-custom-registry CatalogSource in openshift-marketplace"
+        exit 1
+      fi
+
+      echo "Deploying a new MCE Catalog Source."
+      oc apply -f - <<EOF
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: CatalogSource
+      metadata:
+        name: multiclusterengine-catalog
+        namespace: openshift-marketplace
+      spec:
+        displayName: MultiCluster Engine
+        image: quay.io:443/acm-d/mce-custom-registry:$(params.SNAPSHOT)
+        publisher: Red Hat
+        sourceType: grpc
+        updateStrategy:
+          registryPoll:
+            interval: 10m
+      EOF
+
+      if [ $? -ne 0 ]; then
+        echo "Error when attempting to update the multiclusterengine-catalog CatalogSource in openshift-marketplace"
+        exit 1
+      fi
+
+      oc -n open-cluster-management delete csv advanced-cluster-management.v2.5.0
+      if [ $? -ne 0 ]; then
+        exit 1
+      fi
+
+      oc -n multicluster-engine delete csv multicluster-engine.v2.0.0
+      if [ $? -ne 0 ]; then
+        exit 1
+      fi
+
+      oc -n open-cluster-management delete subscription.operator acm-operator-subscription
+      if [ $? -ne 0 ]; then
+        exit 1
+      fi
+
+      oc -n multicluster-engine delete subscription.operator multicluster-engine
+      if [ $? -ne 0 ]; then
+        exit 1
+      fi
+      
+      echo "Pausing 20s for csv and subscription delete to finalize ..."
+      sleep 20
+
+      oc create -f - <<EOF
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        labels:
+          operators.coreos.com/advanced-cluster-management.open-cluster-management: ""
+        name: acm-operator-subscription
+        namespace: open-cluster-management
+      spec:
+        channel: release-2.5
+        installPlanApproval: Automatic
+        name: advanced-cluster-management
+        source: acm-custom-registry
+        sourceNamespace: openshift-marketplace
+        startingCSV: advanced-cluster-management.v2.5.0      
+      EOF
+      if [ $? -ne 0 ]; then
+        exit 1
+      fi
+
+      oc create -f - <<EOF
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        labels:
+          operators.coreos.com/multicluster-engine.multicluster-engine: ""
+        name: multicluster-engine
+        namespace: multicluster-engine
+      spec:
+        channel: stable-2.0
+        installPlanApproval: Automatic
+        name: multicluster-engine
+        source: multiclusterengine-catalog
+        sourceNamespace: openshift-marketplace
+      EOF
+      if [ $? -ne 0 ]; then
+        exit 1
+      fi
+
+      echo "Upgrade complete."
+      if [[ "$@" == *"--watch"* ]]; then
+        watch oc -n multicluster-engine get pods --sort-by=.metadata.creationTimestamp
+      fi
+
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source

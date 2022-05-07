@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: rhacm-deploy-repo-install
+  name: rhacm-deploy-install
 spec:
   workspaces:
   - name: source
@@ -15,14 +15,14 @@ spec:
     description: k8s endpoint url
     type: string
   - name: GITOPS_SECRET_NAME
-    default: 'gitops-secret'
+    default: 'gitops-encoded'
     description: Name of the secret that contains credentials
     type: string
   steps:
   - args:
     - |-
       _TOKEN_RAW=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.ocpTokenEncoded}' | base64 --decode | base64 --decode)
-      _PS=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.globalPullSecretEncoded}' | base64 --decode | tr -d '"')
+      _PS=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.globalPullSecretEncoded}' | base64 --decode)
       
       export KUBECONFIG=/tmp/local-kubeconfig
       oc login --token=$_TOKEN_RAW --server=$(params.API_ENDPOINT) --insecure-skip-tls-verify=true
