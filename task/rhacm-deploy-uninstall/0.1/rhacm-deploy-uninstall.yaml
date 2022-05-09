@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rhacm-deploy-uninstall
+spec:
+  workspaces:
+  - name: source
+  params:
+  - name: API_ENDPOINT
+    default: 'https://api.example.domain.com:6443'
+    description: k8s endpoint url
+    type: string
+  - name: GITOPS_SECRET_NAME
+    default: 'gitops-encoded'
+    description: Name of the secret that contains credentials
+    type: string
+  steps:
+  - args:
+    - |-
+      _TOKEN_RAW=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.ocpTokenEncoded}' | base64 --decode | base64 --decode)
+      _PS=$(oc get secret $(params.GITOPS_SECRET_NAME) -ojsonpath='{.data.globalPullSecretEncoded}' | base64 --decode)
+      
+      export KUBECONFIG=/tmp/local-kubeconfig
+      oc login --token=$_TOKEN_RAW --server=$(params.API_ENDPOINT) --insecure-skip-tls-verify=true
+      oc cluster-info
+
+      echo "DESTROY" | ./uninstall.sh -k
+
+      echo "Check if there are any zombie namespaces"
+      list=$(oc get ns | grep Terminating | awk '{print $1}')
+      for i in $list
+      do
+        echo "Found namespace: $i"
+        oc patch managedclusteraddons.addon.open-cluster-management.io application-manager \
+          -n $i -p '{"metadata":{"finalizers":[]}}' --type=merge
+      done
+      
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source

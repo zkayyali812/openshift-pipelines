@@ -12,6 +12,7 @@ This repo contains sample OpenShift/Tekton Pipelines to automate various tasks a
 | [OpenShift Pipelines Tutorials](https://github.com/openshift/pipelines-tutorial) | Openshift Pipelines community tutorials |
 | [Tekton Pipelines](https://github.com/tektoncd/pipeline) | Tekton Pipelines is the upstream of OpenShift Pipelines |
 | [Tekton Operator](https://github.com/tektoncd/operator) | Tekton Operator is the Operator deployment of Tekton. Also contains code samples |
+| [Tekton Catalog](https://github.com/tektoncd/catalog) | Tekton Catalog of Reusable Tasks |
 | [TektonHub](https://hub.tekton.dev/) | Online repository of Tekton tasks |
 
 
