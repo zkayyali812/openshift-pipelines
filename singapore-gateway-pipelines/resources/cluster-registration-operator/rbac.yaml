@@ -64,12 +64,14 @@ rules:
   - work.open-cluster-management.io
   resources:
   - manifestworks
+  - manifestworks/finalizers
   verbs:
   - create
   - delete
   - get
   - list
   - watch
+  - update
 
 ---
 
