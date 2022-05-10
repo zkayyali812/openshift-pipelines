@@ -53,6 +53,7 @@ rules:
   - authentication.open-cluster-management.io
   resources:
   - managedserviceaccounts
+  - managedserviceaccounts/finalizers
   verbs:
   - create
   - get
