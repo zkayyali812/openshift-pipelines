@@ -264,20 +264,22 @@ spec:
       until oc get sub acm-operator-subscription -o jsonpath='{.status.currentCSV}' | grep -q "advanced";
       do 
           _ATTEMPTS=$((_ATTEMPTS + 1))
-          echo "Attempt: ${_ATTEMPTS}/5 - Waiting for CSV..."
+          echo "Attempt: ${_ATTEMPTS}/5 - Waiting for CSV"
           sleep 5;
           if [[ $_ATTEMPTS == 5 ]]; then
               echo "Failed to find the CSV in allotted time"
               exit 1
           fi
       done
+      echo "ACM CSV has been created"
+      echo ""
 
       _CURRENT_CSV=$(oc get sub acm-operator-subscription -o jsonpath='{.status.currentCSV}')
 
       _ATTEMPTS=0
       until oc get csv ${_CURRENT_CSV} -ojsonpath='{.status.phase}' | grep "Succeeded";
       do 
-          echo "Attempt: ${_ATTEMPTS}/10 - Waiting for CSV installation to complete..."
+          echo "Attempt: ${_ATTEMPTS}/10 - Waiting for CSV installation to complete"
           _ATTEMPTS=$((_ATTEMPTS + 1))
           sleep 15;
           if [[ $_ATTEMPTS == 10 ]]; then
@@ -316,12 +318,12 @@ spec:
       eval "$_LOGIN_CMD"
       oc project open-cluster-management
 
-      oc apply -f samples/hypershift-pipelines/resources/multiclusterhub.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/multiclusterhub.yaml
 
       _ATTEMPTS=0
       until oc get mch multiclusterhub -o jsonpath={'.status.phase'} | grep "Running";
       do 
-          echo "Attempt: ${_ATTEMPTS}/30 - Waiting for MCH to enter a Running state..."
+          echo "Attempt: ${_ATTEMPTS}/30 - Waiting for MCH to enter a Running state"
           _ATTEMPTS=$((_ATTEMPTS + 1))
           sleep 15;
           if [[ $_ATTEMPTS == 30 ]]; then
