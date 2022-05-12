@@ -59,6 +59,15 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
+  - name: configure-hub-idp
+    runAfter:
+    - login-to-hub
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-configure-idp
+    workspaces:
+    - name: source
+      workspace: shared-workspace
   - name: ensure-acm-prereqs
     params:
     - name: snapshot

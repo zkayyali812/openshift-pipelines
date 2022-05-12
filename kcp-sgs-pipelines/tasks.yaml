@@ -434,7 +434,7 @@ spec:
       _TEMPLATE="apiVersion: cluster.open-cluster-management.io/v1alpha1
       kind: HypershiftDeployment
       metadata:
-        name: $(inputs.params.targetManagedCluster)
+        name: $(inputs.params.targetManagedCluster)-hd
         namespace: $(inputs.params.targetManagedCluster)
       spec:
         hostingCluster: $(inputs.params.targetManagedCluster)
@@ -448,23 +448,76 @@ spec:
               region: us-east-2"
       echo "$_TEMPLATE" | oc apply -f -
 
-      echo "Validating HostedCluster appears as managedcluster on hub"
-        _ATTEMPTS=0
-        echo "Waiting for ManagedCluster to be created ..."
-        until oc get managedcluster | grep "$(inputs.params.targetManagedCluster)";
-        do 
-            echo "$_ATTEMPTS/10: Waiting for HostedCluster ManagedCluster to be available... Sleeping 1 min"
-            _ATTEMPTS=$((_ATTEMPTS + 1))
-            sleep 60;
-            if [[ $_ATTEMPTS == 10 ]]; then
-                echo "The managedcluster not come up in the allotted time"
-                exit 1
-            fi
-        done
-        echo "ManagedCluster is running on hub cluster"
+      echo "Validating HostedCluster is imported hub"
+      _ATTEMPTS=0
+      echo "Waiting for ManagedCluster to be created ..."
+      until oc get managedcluster | grep "$(inputs.params.targetManagedCluster)-hd";
+      do 
+        echo "$_ATTEMPTS/10: Waiting for HostedCluster ManagedCluster to be available... Sleeping 1 min"
+        _ATTEMPTS=$((_ATTEMPTS + 1))
+        sleep 60;
+        if [[ $_ATTEMPTS == 10 ]]; then
+            echo "The managedcluster not come up in the allotted time"
+            exit 1
+        fi
+      done
+      echo "HyperShiftDeployment is running on hub cluster"
 
-      echo "HyperShiftDeployment deployed successfully"
+      echo "Validating HyperShiftDeployment has Completed"
+      _ATTEMPTS=0
+      echo "Waiting for ManagedCluster to be created ..."
+      until  oc get hd $(inputs.params.targetManagedCluster)-hd -n $(inputs.params.targetManagedCluster) --no-headers | grep "Completed";
+      do 
+        echo "$_ATTEMPTS/60: HostedCluster is not yet ready"
+        _ATTEMPTS=$((_ATTEMPTS + 1))
+        sleep 60;
+        if [[ $_ATTEMPTS == 60 ]]; then
+            echo "The HyperShiftDeployment is not ready"
+            exit 1
+        fi
+      done
+      echo "HyperShiftDeployment has completed successfully"
+
       exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-kcp-hub-configure-idp
+spec:
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+      
+      _GITHUB_CLIENT_ID=$(oc get secret kcp-sgs-pipelines-github-idp-info -o yaml | yq eval '.data.clientID' - | base64 -d)
+      _GITHUB_CLIENT_SECRET=$(oc get secret kcp-sgs-pipelines-github-idp-info -o yaml | yq eval '.data.clientSecret' - | base64 -d)
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+      
+      echo "CLIENT_ID: $_GITHUB_CLIENT_ID"
+      echo "CLIENT_SECRET: $_GITHUB_CLIENT_SECRET"
+
+      oc create secret generic github-idp-client-secret --from-literal=clientSecret=${_GITHUB_CLIENT_SECRET} -n openshift-config || true
+
+      CLIENT_ID=${_GITHUB_CLIENT_ID} yq eval -i '.spec.identityProviders[0].github.clientID = env(CLIENT_ID)' samples/kcp-sgs-pipelines/resources/github-idp.yaml
+
+      oc apply -f samples/kcp-sgs-pipelines/resources/github-idp.yaml
+
+      exit 0 
     command:
     - /bin/bash
     - -c

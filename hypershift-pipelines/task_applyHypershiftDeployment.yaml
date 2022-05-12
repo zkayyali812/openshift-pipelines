@@ -60,6 +60,7 @@ spec:
                 exit 1
             fi
         done
+        
         echo "Validating HostedCluster on hub cluster 'local-cluster' ..."
         _ATTEMPTS=0
         echo "Waiting for HostedCluster deployment to complete ..."
