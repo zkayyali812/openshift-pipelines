@@ -237,13 +237,13 @@ spec:
 
       existingCSV=$(oc get sub acm-operator-subscription -o yaml | yq eval '.status.currentCSV' -)
       if [[ "$existingCSV" != "" ]]; then
-          echo "Existing ACM install exists"
-          echo $existingCSV
           oc delete sub acm-operator-subscription || true
           oc delete csv $existingCSV || true
       else
-        echo "Existing ACM install does not exist"
+        echo "No existing ACM install"
       fi
+
+      echo ""
 
       oc apply -f samples/hypershift-pipelines/resources/operatorgroup.yaml
       oc patch og default --type=merge -p '{ "spec":  { "targetNamespaces" : ["open-cluster-management"]}}'
@@ -263,8 +263,8 @@ spec:
       _ATTEMPTS=0
       until oc get sub acm-operator-subscription -o jsonpath='{.status.currentCSV}' | grep -q "advanced";
       do 
-          echo "Waiting for CSV..."
           _ATTEMPTS=$((_ATTEMPTS + 1))
+          echo "Attempt: ${_ATTEMPTS}/5 - Waiting for CSV..."
           sleep 5;
           if [[ $_ATTEMPTS == 5 ]]; then
               echo "Failed to find the CSV in allotted time"
@@ -277,7 +277,7 @@ spec:
       _ATTEMPTS=0
       until oc get csv ${_CURRENT_CSV} -ojsonpath='{.status.phase}' | grep "Succeeded";
       do 
-          echo "Waiting for CSV to installation to complete..."
+          echo "Attempt: ${_ATTEMPTS}/10 - Waiting for CSV installation to complete..."
           _ATTEMPTS=$((_ATTEMPTS + 1))
           sleep 15;
           if [[ $_ATTEMPTS == 10 ]]; then
@@ -314,14 +314,14 @@ spec:
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
-      oc project $(inputs.params.namespace)
+      oc project open-cluster-management
 
       oc apply -f samples/hypershift-pipelines/resources/multiclusterhub.yaml
 
       _ATTEMPTS=0
       until oc get mch multiclusterhub -o jsonpath={'.status.phase'} | grep "Running";
       do 
-          echo "Waiting for MCH to enter a Running state..."
+          echo "Attempt: ${_ATTEMPTS}/30 - Waiting for MCH to enter a Running state..."
           _ATTEMPTS=$((_ATTEMPTS + 1))
           sleep 15;
           if [[ $_ATTEMPTS == 30 ]]; then

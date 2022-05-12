@@ -67,6 +67,7 @@ spec:
       value: "$(tasks.checkout-hub-cluster.results.imagePullSecret)"
     runAfter:
     - login-to-hub
+    - fetch-repo-samples
     taskRef:
       kind: Task
       name: deploy-kcp-hub-ensure-acm-prereqs
