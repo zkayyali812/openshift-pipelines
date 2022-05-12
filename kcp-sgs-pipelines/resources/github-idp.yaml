@@ -1,0 +1,15 @@
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+  - name: githubidp 
+    mappingMethod: claim 
+    type: GitHub
+    github:
+      clientID: "GITHUB_CLIENT_ID"
+      clientSecret: 
+        name: github-idp-client-secret
+      teams: 
+      - identitatem/sgs-dev
