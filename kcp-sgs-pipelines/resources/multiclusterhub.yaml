@@ -1,0 +1,12 @@
+apiVersion: operator.open-cluster-management.io/v1
+kind: MultiClusterHub
+metadata:
+  annotations:
+    installer.open-cluster-management.io/mce-subscription-spec: '{"channel": "stable-2.0","installPlanApproval": "Automatic","name": "multicluster-engine","source": "multiclusterengine-catalog","sourceNamespace": "openshift-marketplace"}'
+  name: multiclusterhub
+spec:
+  imagePullSecret: acm-pull-secret
+  overrides:
+    components:
+    - enabled: true
+      name: hypershift-preview
