@@ -76,7 +76,7 @@ spec:
   - name: ensure-acm-subscription
     params:
     - name: snapshot
-      value: "$(params.snapshot)"
+      value: "$(params.downstreamSnapshot)"
     runAfter:
     - ensure-acm-prereqs
     taskRef:
