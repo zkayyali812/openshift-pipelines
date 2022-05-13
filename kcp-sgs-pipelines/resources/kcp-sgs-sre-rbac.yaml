@@ -17,7 +17,7 @@ metadata:
   name: kcp-sgs-sre-clusteradmins-binding
 subjects:
   - kind: Group
-    apiGroup: user.openshift.io
+    apiGroup: rbac.authorization.k8s.io
     name: kcp-sgs-sre-clusteradmins
 roleRef:
   apiGroup: rbac.authorization.k8s.io
