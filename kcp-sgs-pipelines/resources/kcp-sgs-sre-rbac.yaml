@@ -1,0 +1,25 @@
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: kcp-sgs-sre-clusteradmins
+users:
+  - robinbobbitt
+  - tpouyer
+  - cdoan1
+  - chrisahl
+  - zkayyali812
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kcp-sgs-sre-clusteradmins-binding
+subjects:
+  - kind: Group
+    apiGroup: user.openshift.io
+    name: kcp-sgs-sre-clusteradmins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin

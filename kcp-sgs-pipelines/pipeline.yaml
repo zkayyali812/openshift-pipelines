@@ -134,11 +134,27 @@ spec:
     params:
     - name: targetManagedCluster
       value: mgmt-cluster-aws
+    - name: hypershiftDeploymentName
+      value: mgmt-cluster-aws
     runAfter:
     - import-aws-spoke
     taskRef:
       kind: Task
       name: deploy-kcp-hub-hyper-deployment-aws
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: configure-hypershift-azure
+    params:
+    - name: targetManagedCluster
+      value: mgmt-cluster-aws
+    - name: hypershiftDeploymentName
+      value: mgmt-cluster-azure
+    runAfter:
+    - import-aws-spoke
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-hyper-deployment-azure
     workspaces:
     - name: source
       workspace: shared-workspace
