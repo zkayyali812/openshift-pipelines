@@ -663,14 +663,12 @@ spec:
       ENDPOINT=${_AWS_BUCKET_ENDPOINT} yq eval -i '.config.endpoint = env(ENDPOINT)' thanos.yaml
       ACCESSKEY=${_AWS_ACCESS_KEY} yq eval -i '.config.access_key = env(ACCESSKEY)' thanos.yaml
       SECRETKEY=${_AWS_SECRET_ACCESS_KEY} yq eval -i '.config.secret_key = env(SECRETKEY)' thanos.yaml
-      cat thanos.yaml
 
-      thanosYaml=$(cat thanos.yaml) yq eval -i '.stringData."thanos.yaml" = env(thanosYaml)' samples/kcp-sgs-pipelines/resources/observability_secret.yaml
-
-      cat samples/kcp-sgs-pipelines/resources/observability_secret.yaml
+      thanosYaml=$(cat thanos.yaml) yq eval -i '.stringData."thanos.yaml" = strenv(thanosYaml)' samples/kcp-sgs-pipelines/resources/observability_secret.yaml
 
       oc apply -f samples/kcp-sgs-pipelines/resources/observability_secret.yaml
-    
+
+      oc apply -f samples/kcp-sgs-pipelines/resources/multiclusterobservability.yaml
 
       exit 0 
     command:
