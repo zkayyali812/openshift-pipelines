@@ -649,23 +649,23 @@ spec:
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      oc create namespace open-cluster-management-observability || true
+      oc create namespace open-cluster-management-observability --dry-run=client -o yaml | oc apply -f -
 
       _MCH_PULL_SECRET=$(oc get mch multiclusterhub -n open-cluster-management -o yaml | yq eval '.spec.imagePullSecret' -)
       DOCKER_CONFIG_JSON=$(oc extract secret/${_MCH_PULL_SECRET} -n open-cluster-management --to=-)
       oc create secret generic multiclusterhub-operator-pull-secret \
       -n open-cluster-management-observability \
       --from-literal=.dockerconfigjson="$DOCKER_CONFIG_JSON" \
-      --type=kubernetes.io/dockerconfigjson
+      --type=kubernetes.io/dockerconfigjson || true
 
-      thanosYaml=$(yq eval '.stringData."thanos.yaml"' samples/kcp-sgs-pipelines/resources/observability_secret.yaml)
+      yq eval '.stringData."thanos.yaml"' samples/kcp-sgs-pipelines/resources/observability_secret.yaml > thanos.yaml
+      BUCKET=${_AWS_BUCKET_NAME} yq eval -i '.config.bucket = env(BUCKET)' thanos.yaml
+      ENDPOINT=${_AWS_BUCKET_ENDPOINT} yq eval -i '.config.endpoint = env(ENDPOINT)' thanos.yaml
+      ACCESSKEY=${_AWS_ACCESS_KEY} yq eval -i '.config.access_key = env(ACCESSKEY)' thanos.yaml
+      SECRETKEY=${_AWS_SECRET_ACCESS_KEY} yq eval -i '.config.secret_key = env(SECRETKEY)' thanos.yaml
+      cat thanos.yaml
 
-      thanosYaml=$(echo $thanosYaml | BUCKET=${_AWS_BUCKET_NAME} yq eval '.config.bucket = env(BUCKET)' -)
-      thanosYaml=$(echo $thanosYaml | ENDPOINT=${_AWS_BUCKET_ENDPOINT} yq eval '.config.endpoint = env(ENDPOINT)' -)
-      thanosYaml=$(echo $thanosYaml | ACCESSKEY=${_AWS_ACCESS_KEY} yq eval '.config.access_key = env(ACCESSKEY)' -)
-      thanosYaml=$(echo $thanosYaml | SECRETKEY=${_AWS_SECRET_ACCESS_KEY} yq eval '.config.secret_key = env(SECRETKEY)' -)
-
-      thanosYaml=$thanosYaml yq eval -i '.stringData."thanos.yaml" = env(thanosYaml)' samples/kcp-sgs-pipelines/resources/observability_secret.yaml
+      thanosYaml=$(cat thanos.yaml) yq eval -i '.stringData."thanos.yaml" = env(thanosYaml)' samples/kcp-sgs-pipelines/resources/observability_secret.yaml
 
       cat samples/kcp-sgs-pipelines/resources/observability_secret.yaml
 
