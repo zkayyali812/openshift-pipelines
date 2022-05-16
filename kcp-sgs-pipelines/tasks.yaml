@@ -51,6 +51,8 @@ spec:
       CD_INFO=$(oc get clusterdeployment ${NAMESPACE} -n ${NAMESPACE} -o yaml -o=jsonpath='{.spec.clusterMetadata.adminPasswordSecretRef.name}')
       KUBECONFIG_SECRET=$(oc get cd ${NAMESPACE} -n ${NAMESPACE} -o yaml | yq eval '.spec.clusterMetadata.adminKubeconfigSecretRef.name' -)
 
+      oc patch clusterdeployment ${NAMESPACE} -n ${NAMESPACE} --type json -p '[{"op": "add", "path": "/metadata/labels/hibernate", "value": "false"}]'
+
       _USERNAME=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.username}' | base64 -d )
       _PASSWORD=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.password}' | base64 -d  )
       _API_URL=$(oc get cd ${NAMESPACE} -n ${NAMESPACE} -o jsonpath='{.status.apiURL}' )
@@ -505,8 +507,8 @@ spec:
       #!/bin/bash
       set -e
       
-      _GITHUB_CLIENT_ID=$(oc get secret kcp-sgs-pipelines-github-idp-info -o yaml | yq eval '.data.clientID' - | base64 -d)
-      _GITHUB_CLIENT_SECRET=$(oc get secret kcp-sgs-pipelines-github-idp-info -o yaml | yq eval '.data.clientSecret' - | base64 -d)
+      _GITHUB_CLIENT_ID=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.clientID' - | base64 -d)
+      _GITHUB_CLIENT_SECRET=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.clientSecret' - | base64 -d)
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
@@ -625,3 +627,60 @@ spec:
     workingDir: /workspace/source
   workspaces:
   - name: source
+
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-kcp-hub-deploy-observability
+spec:
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _AWS_BUCKET_NAME=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsBucketName' - | base64 -d)
+      _AWS_BUCKET_ENDPOINT=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsBucketEndpoint' - | base64 -d)
+      _AWS_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsAccessKey' - | base64 -d)
+      _AWS_SECRET_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsSecretAccessKey' - | base64 -d)
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      oc create namespace open-cluster-management-observability || true
+
+      _MCH_PULL_SECRET=$(oc get mch multiclusterhub -n open-cluster-management -o yaml | yq eval '.spec.imagePullSecret' -)
+      DOCKER_CONFIG_JSON=$(oc extract secret/${_MCH_PULL_SECRET} -n open-cluster-management --to=-)
+      oc create secret generic multiclusterhub-operator-pull-secret \
+      -n open-cluster-management-observability \
+      --from-literal=.dockerconfigjson="$DOCKER_CONFIG_JSON" \
+      --type=kubernetes.io/dockerconfigjson
+
+      thanosYaml=$(yq eval '.stringData."thanos.yaml"' samples/kcp-sgs-pipelines/resources/observability_secret.yaml)
+
+      thanosYaml=$(echo $thanosYaml | BUCKET=${_AWS_BUCKET_NAME} yq eval '.config.bucket = env(BUCKET)' -)
+      thanosYaml=$(echo $thanosYaml | ENDPOINT=${_AWS_BUCKET_ENDPOINT} yq eval '.config.endpoint = env(ENDPOINT)' -)
+      thanosYaml=$(echo $thanosYaml | ACCESSKEY=${_AWS_ACCESS_KEY} yq eval '.config.access_key = env(ACCESSKEY)' -)
+      thanosYaml=$(echo $thanosYaml | SECRETKEY=${_AWS_SECRET_ACCESS_KEY} yq eval '.config.secret_key = env(SECRETKEY)' -)
+
+      thanosYaml=$thanosYaml yq eval -i '.stringData."thanos.yaml" = env(thanosYaml)' samples/kcp-sgs-pipelines/resources/observability_secret.yaml
+
+      cat samples/kcp-sgs-pipelines/resources/observability_secret.yaml
+
+      oc apply -f samples/kcp-sgs-pipelines/resources/observability_secret.yaml
+    
+
+      exit 0 
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/zkayyali812/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
