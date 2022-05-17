@@ -51,7 +51,7 @@ spec:
       CD_INFO=$(oc get clusterdeployment ${NAMESPACE} -n ${NAMESPACE} -o yaml -o=jsonpath='{.spec.clusterMetadata.adminPasswordSecretRef.name}')
       KUBECONFIG_SECRET=$(oc get cd ${NAMESPACE} -n ${NAMESPACE} -o yaml | yq eval '.spec.clusterMetadata.adminKubeconfigSecretRef.name' -)
 
-      oc patch clusterdeployment ${NAMESPACE} -n ${NAMESPACE} --type json -p '[{"op": "add", "path": "/metadata/labels/hibernate", "value": "false"}]'
+      oc patch clusterdeployment ${NAMESPACE} -n ${NAMESPACE} --type json -p '[{"op": "add", "path": "/metadata/labels/hibernate", "value": "skip"}]'
 
       _USERNAME=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.username}' | base64 -d )
       _PASSWORD=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.password}' | base64 -d  )
@@ -239,8 +239,12 @@ spec:
 
       existingCSV=$(oc get sub acm-operator-subscription -o yaml | yq eval '.status.currentCSV' -)
       if [[ "$existingCSV" != "" ]]; then
-          oc delete sub acm-operator-subscription || true
-          oc delete csv $existingCSV || true
+        # Comment exit for upgrade
+        # echo "ACM Operator Subscription already exists. Skipping..."
+        # exit 0
+        oc delete mco --all || true
+        oc delete sub acm-operator-subscription || true
+        oc delete csv $existingCSV || true
       else
         echo "No existing ACM install"
       fi
@@ -281,10 +285,10 @@ spec:
       _ATTEMPTS=0
       until oc get csv ${_CURRENT_CSV} -ojsonpath='{.status.phase}' | grep "Succeeded";
       do 
-          echo "Attempt: ${_ATTEMPTS}/10 - Waiting for CSV installation to complete"
+          echo "Attempt: ${_ATTEMPTS}/15 - Waiting for CSV installation to complete"
           _ATTEMPTS=$((_ATTEMPTS + 1))
           sleep 15;
-          if [[ $_ATTEMPTS == 10 ]]; then
+          if [[ $_ATTEMPTS == 15 ]]; then
               echo "The CSV failed to install in the allotted time"
               exit 1
           fi
