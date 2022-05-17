@@ -7,7 +7,7 @@ spec:
   - name: clusterName
     type: string
     description: The name of the clusterclaim to create
-    default: "test-kcp-hub"
+    default: "acm-kcp-hub"
   - name: downstreamSnapshot
     type: string
     description: The name of the downstream snapshot to deploy ACM with
@@ -107,7 +107,7 @@ spec:
   - name: checkout-aws-spoke
     params:
     - name: clusterName
-      value: test-cluster-aws
+      value: mgmt-cluster-aws
     - name: clusterPoolName
       value: hypershift-cluster-pool
     runAfter:
@@ -121,7 +121,7 @@ spec:
   - name: import-aws-spoke
     params:
     - name: clusterName
-      value: test-cluster-aws
+      value: mgmt-cluster-aws
     runAfter:
     - checkout-aws-spoke
     taskRef:
@@ -133,9 +133,9 @@ spec:
   - name: configure-hypershift-aws
     params:
     - name: targetManagedCluster
-      value: test-cluster-aws
+      value: mgmt-cluster-aws
     - name: hypershiftDeploymentName
-      value: test-cluster-aws-hd
+      value: mgmt-cluster-aws-hd
     runAfter:
     - import-aws-spoke
     taskRef:
@@ -147,9 +147,9 @@ spec:
   - name: configure-hypershift-azure
     params:
     - name: targetManagedCluster
-      value: test-cluster-aws
+      value: mgmt-cluster-aws
     - name: hypershiftDeploymentName
-      value: test-cluster-azure-hd
+      value: mgmt-cluster-azure-hd
     runAfter:
     - import-aws-spoke
     taskRef:
