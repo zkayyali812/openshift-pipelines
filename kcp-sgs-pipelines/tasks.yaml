@@ -74,7 +74,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -116,7 +116,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -206,7 +206,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -300,7 +300,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -343,7 +343,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -395,7 +395,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -491,7 +491,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -529,7 +529,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -625,7 +625,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -678,7 +678,7 @@ spec:
     command:
     - /bin/bash
     - -c
-    image: quay.io/zkayyali812/ocm-utils:latest
+    image: quay.io/acm-sre/ocm-utils:latest
     name: apply
     resources: {}
     workingDir: /workspace/source
@@ -686,3 +686,36 @@ spec:
   - name: source
 
 ---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-kcp-hub-deploy-alertmanager-to-github
+spec:
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _GITHUB_TOKEN=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.githubToken' - | base64 -d)
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      TOKEN=${_GITHUB_TOKEN} yq eval -i '.stringData.ATG_GITHUB_TOKEN = env(TOKEN)' prereqs/kcp-sgs-pipelines/resources/alertmanager-to-github/secret.yaml
+
+      oc apply -k prereqs/kcp-sgs-pipelines/resources/alertmanager-to-github/
+
+      echo "Alertmanager to Github is deployed"
+
+      exit 0 
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

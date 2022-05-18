@@ -7,7 +7,7 @@ spec:
   - name: clusterName
     type: string
     description: The name of the clusterclaim to create
-    default: "acm-kcp-hub"
+    default: "test-kcp-hub"
   - name: downstreamSnapshot
     type: string
     description: The name of the downstream snapshot to deploy ACM with
@@ -107,7 +107,7 @@ spec:
   - name: checkout-aws-spoke
     params:
     - name: clusterName
-      value: mgmt-cluster-aws
+      value: test-cluster-aws
     - name: clusterPoolName
       value: hypershift-cluster-pool
     runAfter:
@@ -121,7 +121,7 @@ spec:
   - name: import-aws-spoke
     params:
     - name: clusterName
-      value: mgmt-cluster-aws
+      value: test-cluster-aws
     runAfter:
     - checkout-aws-spoke
     taskRef:
@@ -133,9 +133,9 @@ spec:
   - name: configure-hypershift-aws
     params:
     - name: targetManagedCluster
-      value: mgmt-cluster-aws
+      value: test-cluster-aws
     - name: hypershiftDeploymentName
-      value: mgmt-cluster-aws-hd
+      value: test-cluster-aws-hd
     runAfter:
     - import-aws-spoke
     taskRef:
@@ -147,9 +147,9 @@ spec:
   - name: configure-hypershift-azure
     params:
     - name: targetManagedCluster
-      value: mgmt-cluster-aws
+      value: test-cluster-aws
     - name: hypershiftDeploymentName
-      value: mgmt-cluster-azure-hd
+      value: test-cluster-azure-hd
     runAfter:
     - import-aws-spoke
     taskRef:
@@ -164,6 +164,15 @@ spec:
     taskRef:
       kind: Task
       name: deploy-kcp-hub-deploy-observability
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: deploy-alertmanager-to-github
+    runAfter:
+    - ensure-mch
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-deploy-alertmanager-to-github
     workspaces:
     - name: source
       workspace: shared-workspace
