@@ -18,6 +18,6 @@ jobs:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       run:  |
-        docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD quay.io/zkayyali812/ocm-utils:latest && \
-        docker build ocm-utils -t quay.io/zkayyali812/ocm-utils:latest && \
-        docker push quay.io/zkayyali812/ocm-utils:latest
+        docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD quay.io/acm-sre/ocm-utils:latest && \
+        docker build ocm-utils -t quay.io/acm-sre/ocm-utils:latest && \
+        docker push quay.io/acm-sre/ocm-utils:latest
