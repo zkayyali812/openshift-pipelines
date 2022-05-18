@@ -1,6 +1,8 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-RUN microdnf update -y && microdnf install -y tar gzip curl jq wget git make unzip python38 python38-pip
+RUN microdnf update -y && microdnf install -y python39 python-pip tar gzip jq wget git make unzip
+
+RUN python3 -m pip install --upgrade pip
 
 RUN python3 -m pip install ansible
 
