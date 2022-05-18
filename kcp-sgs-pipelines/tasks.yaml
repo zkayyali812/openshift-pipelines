@@ -703,11 +703,48 @@ spec:
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      TOKEN=${_GITHUB_TOKEN} yq eval -i '.stringData.ATG_GITHUB_TOKEN = env(TOKEN)' prereqs/kcp-sgs-pipelines/resources/alertmanager-to-github/secret.yaml
+      TOKEN=${_GITHUB_TOKEN} yq eval -i '.stringData.ATG_GITHUB_TOKEN = env(TOKEN)' samples/kcp-sgs-pipelines/resources/alertmanager-to-github/secret.yaml
 
-      oc apply -k prereqs/kcp-sgs-pipelines/resources/alertmanager-to-github/
+      oc apply -k samples/kcp-sgs-pipelines/resources/alertmanager-to-github/
 
       echo "Alertmanager to Github is deployed"
+
+      exit 0 
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-kcp-hub-deploy-alertmanager
+spec:
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _defaultSlackAPI=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.defaultSlackAPI' - | base64 -d)
+      _pagerdutyServiceKey=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.pagerdutyServiceKey' - | base64 -d)
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      sed -i -e 's/<DEFAULT_SLACK_API_URL>/'${_defaultSlackAPI}'/g' samples/kcp-sgs-pipelines/resources/alertmanager.yaml
+      sed -i -e 's/<PAGERDUTY_SERVICE_KEY>/'${_pagerdutyServiceKey}'/g' samples/kcp-sgs-pipelines/resources/alertmanager.yaml
+
+      oc apply -f samples/kcp-sgs-pipelines/resources/alertmanager.yaml
+
+      echo "Alertmanager is deployed"
 
       exit 0 
     command:
