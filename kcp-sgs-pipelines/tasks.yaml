@@ -739,8 +739,8 @@ spec:
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      sed -i -e 's/<DEFAULT_SLACK_API_URL>/'${_defaultSlackAPI}'/g' samples/kcp-sgs-pipelines/resources/alertmanager.yaml
-      sed -i -e 's/<PAGERDUTY_SERVICE_KEY>/'${_pagerdutyServiceKey}'/g' samples/kcp-sgs-pipelines/resources/alertmanager.yaml
+      sed -i -e "s@<DEFAULT_SLACK_API_URL>@${_defaultSlackAPI}@g" samples/kcp-sgs-pipelines/resources/alertmanager.yaml
+      sed -i -e "s@<PAGERDUTY_SERVICE_KEY>@${_pagerdutyServiceKey}@g" samples/kcp-sgs-pipelines/resources/alertmanager.yaml
 
       oc apply -f samples/kcp-sgs-pipelines/resources/alertmanager.yaml
 
