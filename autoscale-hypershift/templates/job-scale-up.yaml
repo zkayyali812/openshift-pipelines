@@ -1,0 +1,41 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: autoscale-hypershift
+objects:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: autoscale-hypershift-job-${RANDOM_ID}
+      namespace: ${NAMESPACE}
+    spec:
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: autoscale-hypershift
+          containers:
+          - name: worker
+            image: ${CURATOR_IMAGE}
+            imagePullPolicy: Always
+            command: ['./action']
+            env:
+            - name: TAKE_ACTION
+              value: ScaleUp
+            - name: OPT_IN
+              value: ${OPT_IN}
+          restartPolicy: OnFailure
+parameters:
+  - name: OPT_IN
+    description: When set to "true", only ClusterDeployments with label autoscale-hypershift=true are scaled up/down.
+    value: "false" 
+    required: true
+  - name: CURATOR_IMAGE
+    description: HyperShift scaler curator image
+    value: quay.io/zkayyali812/autoscale-hypershift:latest
+    required: true
+  - name: RANDOM_ID
+    generate: expression
+    from: "[a-z0-9]{5}"
+  - name: NAMESPACE 
+    description: The namespace where the autoscale-hypershift CronJobs were installed
+    required: true
