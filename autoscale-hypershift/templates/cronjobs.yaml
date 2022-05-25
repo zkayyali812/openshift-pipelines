@@ -1,0 +1,86 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: autoscale-hypershift
+objects:
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: autoscale-hypershift
+      namespace: ${NAMESPACE}
+  - apiVersion: batch/v1beta1
+    kind: CronJob
+    metadata:
+      name: autoscale-hypershift-cronjob
+      namespace: ${NAMESPACE}
+    spec:
+      schedule: ${SCALE_DOWN_SCHEDULE}
+      suspend: ${{SCALE_DOWN_DISABLED}}
+      jobTemplate:
+        spec:
+          template:
+            spec: 
+              serviceAccountName: autoscale-hypershift
+              containers:
+              - name: worker
+                image: ${CURATOR_IMAGE}
+                imagePullPolicy: IfNotPresent
+                command: ['./action']
+                env:
+                - name: TAKE_ACTION
+                  value: ScaleDown
+                - name: OPT_IN
+                  value: ${OPT_IN}
+              restartPolicy: OnFailure
+  - apiVersion: batch/v1beta1
+    kind: CronJob
+    metadata:
+      name: scale-up-cronjob
+      namespace: ${NAMESPACE}
+    spec:
+      schedule: ${SCALE_UP_SCHEDULE}
+      suspend: ${{SCALE_UP_DISABLED}}
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: autoscale-hypershift
+              containers:
+              - name: worker
+                image: ${CURATOR_IMAGE}
+                imagePullPolicy: IfNotPresent
+                command: ['./action']
+                env:
+                - name: TAKE_ACTION
+                  value: ScaleUp
+                - name: OPT_IN
+                  value: ${OPT_IN}
+              restartPolicy: OnFailure
+parameters:
+  - name: SCALE_DOWN_SCHEDULE 
+    description: Scaledown schedule in UTC (e.g. "0 23 * * 0-6" is everyday at 6pm EST)
+    value: 0 23 * * 0-6
+    required: true 
+  - name: SCALE_UP_SCHEDULE 
+    description: Resume schedule in UTC (e.g. "0 13 * * 1-5" is weekdays at 8am EST)
+    value: 0 13 * * 1-5
+    required: true
+  - name: SCALE_DOWN_DISABLED
+    description: Disable scaledown CronJob
+    value: "false"
+    required: true
+  - name: SCALE_UP_DISABLED
+    description: Disable resume CronJob
+    value: "false"
+    required: true
+  - name: OPT_IN
+    description: When set to "true", only ClusterDeployments with label autoscale-hypershift=true scale up/down.
+    value: "false" 
+    required: true
+  - name: CURATOR_IMAGE
+    description: HyperShift scaler curator image
+    value: quay.io/zkayyali812/autoscale-hypershift:latest
+    required: true
+  - name: NAMESPACE 
+    description: The namespace where the scaledown CronJobs were installed
+    required: true
