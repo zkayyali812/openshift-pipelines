@@ -22,7 +22,8 @@ spec:
   - name: imagePullSecret
     description: The imagePullSecret on the hub cluster.
   steps:
-  - args:
+  - name: checkout-cluster
+    args:
     - |-
       #!/bin/bash
       set -e
@@ -59,11 +60,14 @@ spec:
       
       oc get secret -n ${NAMESPACE} ${KUBECONFIG_SECRET} -o yaml | yq eval '.data.kubeconfig' - | base64 -d > $(inputs.params.clusterName)-kubeconfig.yaml
       
-      _IMAGE_PULL_SECRET=$(oc get secret kcp-sgs-pipelines-multiclusterhub-operator-pull-secret -o yaml | yq eval '.data.".dockerconfigjson"' -)
+      _IMAGE_PULL_SECRET=$(oc get secret autoscale-hypershift-acm-pull-secret -o yaml | yq eval '.data.".dockerconfigjson"' -)
 
-      echo "$_USERNAME" | tr -d '\n' > $(results.username.path)
-      echo "$_PASSWORD" | tr -d '\n' > $(results.password.path)
-      echo "$_API_URL" | tr -d '\n' > $(results.api.path)
+      mkdir -p /workspace/$(inputs.params.clusterName)/
+      echo "$_USERNAME" > /workspace/$(inputs.params.clusterName)/USERNAME
+      echo "$_PASSWORD" > /workspace/$(inputs.params.clusterName)/PASSWORD
+      echo "$_API_URL" > /workspace/$(inputs.params.clusterName)/API_URL
+      echo "$_IMAGE_PULL_SECRET" > /workspace/$(inputs.params.clusterName)/IMAGE_PULL_SECRET
+
       echo "$_IMAGE_PULL_SECRET" | tr -d '\n' > $(results.imagePullSecret.path)
 
       echo "API URL of claimed cluster: $_API_URL"
@@ -75,39 +79,20 @@ spec:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: deploy-kcp-hub-login-to-hub
-spec:
-  params:
-  - name: username
-    default: kubeadmin
-    description: The username of the claimed cluster
-    type: string
-  - name: password
-    default: password
-    description: The password of the claimed cluster
-    type: string
-  - name: api
-    default: https://api.openshift.com
-    description: The claimed cluster API URL
-    type: string
-  steps:
-  - args:
+  - name: login
+    args:
     - |-
       #!/bin/bash
       set -e
+
+      export _USERNAME=$(cat /workspace/$(inputs.params.clusterName)/USERNAME)
+      export _PASSWORD=$(cat /workspace/$(inputs.params.clusterName)/PASSWORD)
+      export _API_URL=$(cat /workspace/$(inputs.params.clusterName)/API_URL)
+      export _IMAGE_PULL_SECRET=$(cat /workspace/$(inputs.params.clusterName)/IMAGE_PULL_SECRET)
       
-      LOGINCMD="oc login $(inputs.params.api) -u $(inputs.params.username) -p $(inputs.params.password) --insecure-skip-tls-verify=true"
+      LOGINCMD="oc login ${_API_URL} -u ${_USERNAME} -p ${_PASSWORD} --insecure-skip-tls-verify=true"
       eval $LOGINCMD
       
       echo $LOGINCMD > login.sh
@@ -117,7 +102,6 @@ spec:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
   workspaces:
@@ -128,25 +112,24 @@ spec:
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: deploy-kcp-hub-ensure-acm-prereqs
+  name: deploy-kcp-hub-ensure-acm
 spec:
   params:
-  - name: snapshot
-    default: ""
-    description: The SNAPSHOT Tag used to deploy the catalogsources
-    type: string
   - name: imagePullSecret
     default: ""
     description: The image pull secret used to deploy the catalogsources. Copied from clusterPoolNamespace
     type: string
   steps:
-  - args:
+  - name: ensure-prereqs
+    args:
     - |-
       #!/bin/bash
       set -e
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
+
+      oc project
 
       echo "Creating Namespace..."
       oc create namespace open-cluster-management --dry-run=client -o yaml | oc apply -f -
@@ -162,112 +145,10 @@ spec:
       echo "$_TEMPLATE" | oc apply -n open-cluster-management -f  -
       echo "$_TEMPLATE" | oc apply -n openshift-marketplace -f -
 
-      echo "Creating ACM CatalogSource..."
-
-      _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
-      kind: CatalogSource
-      metadata:
-        name: acm-custom-registry
-        namespace: openshift-marketplace
-      spec:
-        displayName: Advanced Cluster Management
-        image: quay.io/acm-d/acm-custom-registry:$(inputs.params.snapshot)
-        publisher: Red Hat
-        sourceType: grpc
-        updateStrategy:
-          registryPoll:
-            interval: 10m
-        secrets:
-        - acm-pull-secret"
-      echo "$_TEMPLATE" | oc apply -f -
-
-      echo "Creating MCE CatalogSource..."
-
-      _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
-      kind: CatalogSource
-      metadata:
-        name: multiclusterengine-catalog
-        namespace: openshift-marketplace
-      spec:
-        displayName: MultiCluster Engine
-        image: quay.io/acm-d/mce-custom-registry:$(inputs.params.snapshot)
-        publisher: Red Hat
-        sourceType: grpc
-        updateStrategy:
-          registryPoll:
-            interval: 10m
-        secrets:
-        - acm-pull-secret"
-      echo "$_TEMPLATE" | oc apply -f -
-
-      echo "Created ACM Prereqs successfully."
-      exit 0
-
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
-    resources: {}
-    workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: deploy-kcp-hub-acm-apply-sub
-spec:
-  params:
-  - name: snapshot
-    default: 2.5.0-SNAPSHOT
-    description: The snapshot used to deploy MCE
-    type: string
-  steps:
-  - args:
-    - |-
-      #!/bin/bash
-      set -e
-
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
-
-      oc project open-cluster-management
-      _CHANNEL="release-$(echo $(inputs.params.snapshot) | cut -c1-3)"
-
-      existingCSV=$(oc get sub acm-operator-subscription -o yaml | yq eval '.status.currentCSV' -)
-      if [[ "$existingCSV" != "" ]]; then
-        # Comment exit for upgrade
-        # echo "ACM Operator Subscription already exists. Skipping..."
-        # exit 0
-        oc delete mco --all || true
-        oc delete sub acm-operator-subscription || true
-        oc delete csv $existingCSV || true
-      else
-        echo "No existing ACM install"
-      fi
-
-      echo ""
-
-      oc apply -f samples/hypershift-pipelines/resources/operatorgroup.yaml
-      oc patch og default --type=merge -p '{ "spec":  { "targetNamespaces" : ["open-cluster-management"]}}'
-
-      _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
-      kind: Subscription
-      metadata:
-        name: acm-operator-subscription
-      spec:
-        channel: ${_CHANNEL}
-        installPlanApproval: Automatic
-        name: advanced-cluster-management
-        source: acm-custom-registry
-        sourceNamespace: openshift-marketplace"
-      echo "$_TEMPLATE" | oc apply -f -
-
+      oc apply -f samples/kcp-sgs-pipelines/resources/openshift-gitops-sub.yaml
+      echo "Creating OpenShift Gitops Subscription ..."
       _ATTEMPTS=0
-      until oc get sub acm-operator-subscription -o jsonpath='{.status.currentCSV}' | grep -q "advanced";
+      until oc get sub openshift-gitops-operator -n openshift-operators -o jsonpath='{.status.currentCSV}' | grep -q "openshift-gitops-operator";
       do 
           _ATTEMPTS=$((_ATTEMPTS + 1))
           echo "Attempt: ${_ATTEMPTS}/5 - Waiting for CSV"
@@ -277,13 +158,13 @@ spec:
               exit 1
           fi
       done
-      echo "ACM CSV has been created"
+      echo "OpenShift GitOps CSV has been created"
+
       echo ""
-
-      _CURRENT_CSV=$(oc get sub acm-operator-subscription -o jsonpath='{.status.currentCSV}')
-
-      _ATTEMPTS=0
-      until oc get csv ${_CURRENT_CSV} -ojsonpath='{.status.phase}' | grep "Succeeded";
+      _CURRENT_CSV=$(oc get sub openshift-gitops-operator -n openshift-operators -o jsonpath='{.status.currentCSV}')
+      
+      _ATTEMPTS=0 
+      until oc get csv ${_CURRENT_CSV} -n openshift-operators -o jsonpath='{.status.phase}' | grep "Succeeded";
       do 
           echo "Attempt: ${_ATTEMPTS}/15 - Waiting for CSV installation to complete"
           _ATTEMPTS=$((_ATTEMPTS + 1))
@@ -294,45 +175,34 @@ spec:
           fi
       done
 
-      echo "ACM subscription installation has succeeeded"
+      echo "ACM Prereqs installation has succeeded"
       exit 0
 
     command:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: deploy-kcp-hub-apply-mch
-spec:
-  steps:
-  - args:
+  - name: ensure-acm
+    args:
     - |-
       #!/bin/bash
       set -e
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
-      oc project open-cluster-management
 
-      oc apply -f samples/kcp-sgs-pipelines/resources/multiclusterhub.yaml
-
+      oc apply -f samples/kcp-sgs-pipelines/resources/acm-argo.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/argo-rbac.yaml
+      
       _ATTEMPTS=0
-      until oc get mch multiclusterhub -o jsonpath={'.status.phase'} | grep "Running";
+      until oc get mch multiclusterhub -n open-cluster-management -o jsonpath={'.status.phase'} | grep "Running";
       do 
-          echo "Attempt: ${_ATTEMPTS}/30 - Waiting for MCH to enter a Running state"
+          echo "Attempt: ${_ATTEMPTS}/60 - Waiting for MCH to enter a Running state"
           _ATTEMPTS=$((_ATTEMPTS + 1))
-          sleep 15;
-          if [[ $_ATTEMPTS == 30 ]]; then
+          sleep 60;
+          if [[ $_ATTEMPTS == 60 ]]; then
               echo "Failed to install the MCH in allotted time"
               exit 1
           fi
@@ -340,11 +210,11 @@ spec:
 
       echo "MultiClusterHub is running"
       exit 0
+
     command:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
   workspaces:

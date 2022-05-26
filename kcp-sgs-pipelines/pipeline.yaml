@@ -8,12 +8,8 @@ spec:
     type: string
     description: The name of the clusterclaim to create
     default: "test-kcp-hub"
-  - name: downstreamSnapshot
-    type: string
-    description: The name of the downstream snapshot to deploy ACM with
-    default: "2.5-latest"
   tasks:
-  - name: fetch-repo-samples
+  - name: fetch-repository
     params:
     - name: url
       value: https://github.com/stolostron/openshift-pipelines.git
@@ -31,7 +27,9 @@ spec:
     workspaces:
     - name: output
       workspace: shared-workspace
-  - name: checkout-hub-cluster
+  - name: checkout-cluster
+    runAfter:
+    - fetch-repository
     params:
     - name: clusterPoolName
       value: hypershift-cluster-pool
@@ -43,147 +41,107 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: login-to-hub
-    params:
-    - name: username
-      value: "$(tasks.checkout-hub-cluster.results.username)"
-    - name: password
-      value: "$(tasks.checkout-hub-cluster.results.password)"
-    - name: api
-      value: "$(tasks.checkout-hub-cluster.results.api)"
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-login-to-hub
-    runAfter:
-      - checkout-hub-cluster
-    workspaces:
-    - name: source
-      workspace: shared-workspace
   - name: configure-hub-idp
     runAfter:
-    - login-to-hub
+    - checkout-cluster
     taskRef:
       kind: Task
       name: deploy-kcp-hub-configure-idp
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: ensure-acm-prereqs
+  - name: ensure-acm
     params:
-    - name: snapshot
-      value: "$(params.downstreamSnapshot)"
     - name: imagePullSecret
-      value: "$(tasks.checkout-hub-cluster.results.imagePullSecret)"
+      value: "$(tasks.checkout-cluster.results.imagePullSecret)"
     runAfter:
-    - login-to-hub
-    - fetch-repo-samples
+    - checkout-cluster
     taskRef:
       kind: Task
-      name: deploy-kcp-hub-ensure-acm-prereqs
+      name: deploy-kcp-hub-ensure-acm
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: ensure-acm-subscription
-    params:
-    - name: snapshot
-      value: "$(params.downstreamSnapshot)"
-    runAfter:
-    - ensure-acm-prereqs
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-acm-apply-sub
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: ensure-mch
-    runAfter:
-    - ensure-acm-subscription
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-apply-mch
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: checkout-aws-spoke
-    params:
-    - name: clusterName
-      value: test-cluster-aws
-    - name: clusterPoolName
-      value: hypershift-cluster-pool
-    runAfter:
-    - ensure-mch
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-checkout-cluster
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: import-aws-spoke
-    params:
-    - name: clusterName
-      value: test-cluster-aws
-    runAfter:
-    - checkout-aws-spoke
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-import-spoke
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: configure-hypershift-aws
-    params:
-    - name: targetManagedCluster
-      value: test-cluster-aws
-    - name: hypershiftDeploymentName
-      value: test-cluster-aws-hd
-    runAfter:
-    - import-aws-spoke
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-hyper-deployment-aws
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: configure-hypershift-azure
-    params:
-    - name: targetManagedCluster
-      value: test-cluster-aws
-    - name: hypershiftDeploymentName
-      value: test-cluster-azure-hd
-    runAfter:
-    - import-aws-spoke
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-hyper-deployment-azure
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: deploy-observability
-    runAfter:
-    - ensure-mch
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-deploy-observability
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: deploy-alertmanager-to-github
-    runAfter:
-    - ensure-mch
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-deploy-alertmanager-to-github
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: deploy-alertmanager
-    runAfter:
-    - deploy-alertmanager-to-github
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-deploy-alertmanager
-    workspaces:
-    - name: source
-      workspace: shared-workspace
+  # - name: checkout-aws-spoke
+  #   params:
+  #   - name: clusterName
+  #     value: test-cluster-aws
+  #   - name: clusterPoolName
+  #     value: hypershift-cluster-pool
+  #   runAfter:
+  #   - ensure-mch
+  #   taskRef:
+  #     kind: Task
+  #     name: deploy-kcp-hub-checkout-cluster
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
+  # - name: import-aws-spoke
+  #   params:
+  #   - name: clusterName
+  #     value: test-cluster-aws
+  #   runAfter:
+  #   - checkout-aws-spoke
+  #   taskRef:
+  #     kind: Task
+  #     name: deploy-kcp-hub-import-spoke
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
+  # - name: configure-hypershift-aws
+  #   params:
+  #   - name: targetManagedCluster
+  #     value: test-cluster-aws
+  #   - name: hypershiftDeploymentName
+  #     value: test-cluster-aws-hd
+  #   runAfter:
+  #   - import-aws-spoke
+  #   taskRef:
+  #     kind: Task
+  #     name: deploy-kcp-hub-hyper-deployment-aws
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
+  # - name: configure-hypershift-azure
+  #   params:
+  #   - name: targetManagedCluster
+  #     value: test-cluster-aws
+  #   - name: hypershiftDeploymentName
+  #     value: test-cluster-azure-hd
+  #   runAfter:
+  #   - import-aws-spoke
+  #   taskRef:
+  #     kind: Task
+  #     name: deploy-kcp-hub-hyper-deployment-azure
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
+  # - name: deploy-observability
+  #   runAfter:
+  #   - ensure-mch
+  #   taskRef:
+  #     kind: Task
+  #     name: deploy-kcp-hub-deploy-observability
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
+  # - name: deploy-alertmanager-to-github
+  #   runAfter:
+  #   - ensure-mch
+  #   taskRef:
+  #     kind: Task
+  #     name: deploy-kcp-hub-deploy-alertmanager-to-github
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
+  # - name: deploy-alertmanager
+  #   runAfter:
+  #   - deploy-alertmanager-to-github
+  #   taskRef:
+  #     kind: Task
+  #     name: deploy-kcp-hub-deploy-alertmanager
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
   workspaces:
   - name: shared-workspace
