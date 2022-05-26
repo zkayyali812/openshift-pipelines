@@ -77,5 +77,28 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
+  - name: scale-hypershiftdeployments
+    runAfter:
+    - apply-hypershiftdeployments
+    taskRef:
+      kind: Task
+      name: autoscale-hypershift-apply-autoscale-hd-test
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: publish-image
+    taskRef:
+      kind: ClusterTask
+      name: buildah
+    runAfter:
+    - scale-hypershiftdeployments
+    params:
+    - name: IMAGE
+      value: "$(params.quayTag)"
+    - name: CONTEXT
+      value: samples/autoscale-hypershift/
+    workspaces:
+    - name: source
+      workspace: shared-workspace
   workspaces:
   - name: shared-workspace

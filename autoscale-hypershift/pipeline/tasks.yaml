@@ -222,7 +222,6 @@ spec:
 
 ---
 
-
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
@@ -276,10 +275,105 @@ spec:
         sleep 60;
         if [[ $_ATTEMPTS == 60 ]]; then
             echo "The HyperShiftDeployment is not ready"
+            oc delete hd aws-hd -n local-cluster
             exit 1
         fi
       done
       echo "HyperShiftDeployment has completed successfully"
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: autoscale-hypershift-apply-autoscale-hd-test
+spec:
+  steps:
+  - name: hypershift-scale-up-test
+    args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      cd samples/autoscale-hypershift
+
+      cat > options.env << EOF
+      NAMESPACE: open-cluster-management
+      CURATOR_IMAGE: quay.io/acm-sre/autoscale-hypershift:test
+      EOF
+
+      make roles
+      make scale-up
+
+      echo "Validating HyperShiftDeployment has scaled up"
+      _ATTEMPTS=0
+      until oc get nodepool aws-hd -n local-cluster -o jsonpath='{.spec.autoScaling}' | grep "max";
+      do 
+        echo "$_ATTEMPTS/60: Autoscaling has not yet taken effect"
+        _ATTEMPTS=$((_ATTEMPTS + 1))
+        sleep 60;
+        if [[ $_ATTEMPTS == 60 ]]; then
+            echo "The HyperShiftDeployment has not autoscaled"
+            oc delete hd aws-hd -n local-cluster
+            exit 1
+        fi
+      done
+      echo "HyperShiftDeployment has scaled up successfully"
+
+      make scale-down
+
+      echo "Validating HyperShiftDeployment has scaled down"
+      _ATTEMPTS=0
+      until oc get nodepool aws-hd -n local-cluster -o jsonpath='{.status.replicas}' | grep "1";
+      do 
+        echo "$_ATTEMPTS/60: Manual scale down has not yet taken effect"
+        _ATTEMPTS=$((_ATTEMPTS + 1))
+        sleep 60;
+        if [[ $_ATTEMPTS == 60 ]]; then
+            echo "The HyperShiftDeployment has not removed autoscaling"
+            oc delete hd aws-hd -n local-cluster
+            exit 1
+        fi
+      done
+      echo "HyperShiftDeployment has scaled down successfully"
+
+      make scale-up
+
+      echo "Validating HyperShiftDeployment has scaled back up after manual scale down"
+      _ATTEMPTS=0
+      until oc get nodepool aws-hd -n local-cluster -o jsonpath='{.status.replicas}' | grep "2";
+      do 
+        echo "$_ATTEMPTS/60: Manual scale up has not yet taken effect"
+        _ATTEMPTS=$((_ATTEMPTS + 1))
+        sleep 60;
+        if [[ $_ATTEMPTS == 60 ]]; then
+            echo "The HyperShiftDeployment has not enabled autoscaling and scaled back up"
+            oc delete hd aws-hd -n local-cluster
+            exit 1
+        fi
+      done
+      echo "HyperShiftDeployment has scaled back up successfully"
+
+     
+      echo "HyperShift can scale up/down as expected"
+
+      echo "Cleaning up HyperShiftDeployment"
+      oc delete hd aws-hd -n local-cluster
+      echo "All done"
+      exit 0
 
     command:
     - /bin/bash
