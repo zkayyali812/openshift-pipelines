@@ -31,7 +31,7 @@ parameters:
     required: true
   - name: CURATOR_IMAGE
     description: HyperShift scaler curator image
-    value: quay.io/zkayyali812/autoscale-hypershift:latest
+    value: quay.io/acm-sre/autoscale-hypershift:latest
     required: true
   - name: RANDOM_ID
     generate: expression
