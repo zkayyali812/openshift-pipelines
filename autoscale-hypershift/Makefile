@@ -18,7 +18,7 @@ all:
 	@echo "  make clean-cronjobs # Deletes the CronJobs"
 	@echo "  make clean-roles    # Deletes the ClusterRole and ClusterRoleBinding"
 
-REPO_URL ?= quay.io/zkayyali812
+REPO_URL ?= quay.io/acm-sre
 VERSION ?= 0.0.1
 options.env:
 	touch options.env
