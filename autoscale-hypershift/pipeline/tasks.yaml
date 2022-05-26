@@ -188,47 +188,50 @@ spec:
           fi
       done
 
-      echo "OpenShift Gitops subscription installation has succeeded"
+      echo "ACM Prereqs installation has succeeded"
+      exit 0
 
-      # echo "Creating ACM CatalogSource..."
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
 
-      # _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
-      # kind: CatalogSource
-      # metadata:
-      #   name: acm-custom-registry
-      #   namespace: openshift-marketplace
-      # spec:
-      #   displayName: Advanced Cluster Management
-      #   image: quay.io/acm-d/acm-custom-registry:$(inputs.params.snapshot)
-      #   publisher: Red Hat
-      #   sourceType: grpc
-      #   updateStrategy:
-      #     registryPoll:
-      #       interval: 10m
-      #   secrets:
-      #   - acm-pull-secret"
-      # echo "$_TEMPLATE" | oc apply -f -
+---
 
-      # echo "Creating MCE CatalogSource..."
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: autoscale-hypershift-ensure-acm
+spec:
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
 
-      # _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
-      # kind: CatalogSource
-      # metadata:
-      #   name: multiclusterengine-catalog
-      #   namespace: openshift-marketplace
-      # spec:
-      #   displayName: MultiCluster Engine
-      #   image: quay.io/acm-d/mce-custom-registry:$(inputs.params.snapshot)
-      #   publisher: Red Hat
-      #   sourceType: grpc
-      #   updateStrategy:
-      #     registryPoll:
-      #       interval: 10m
-      #   secrets:
-      #   - acm-pull-secret"
-      # echo "$_TEMPLATE" | oc apply -f -
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
 
-      echo "Created ACM Prereqs successfully."
+      oc apply -f samples/autoscale-hypershift/pipeline/resources/acm-argo.yaml
+
+      _ATTEMPTS=0
+      until oc get mch multiclusterhub -n open-cluster-management -o jsonpath={'.status.phase'} | grep "Running";
+      do 
+          echo "Attempt: ${_ATTEMPTS}/60 - Waiting for MCH to enter a Running state"
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          sleep 15;
+          if [[ $_ATTEMPTS == 60 ]]; then
+              echo "Failed to install the MCH in allotted time"
+              exit 1
+          fi
+      done
+
+      echo "MultiClusterHub is running"
       exit 0
 
     command:
