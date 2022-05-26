@@ -1,0 +1,104 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: singaporegateway-cluster-registration
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.open-cluster-management.io
+  resources:
+  - managedclusters
+  - managedclustersets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - register.open-cluster-management.io
+  resources:
+  - managedclusters/accept
+  verbs:
+  - update
+- apiGroups:
+  - cluster.open-cluster-management.io
+  resources:
+  - managedclustersets/join
+  - managedclustersets/bind
+  verbs:
+  - create
+  - delete
+- apiGroups:
+  - addon.open-cluster-management.io
+  resources:
+  - managedclusteraddons
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - delete
+  - watch
+- apiGroups:
+  - authentication.open-cluster-management.io
+  resources:
+  - managedserviceaccounts
+  - managedserviceaccounts/finalizers
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - delete
+  - watch
+- apiGroups:
+  - work.open-cluster-management.io
+  resources:
+  - manifestworks
+  - manifestworks/finalizers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+  - update
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: singaporegateway-cluster-registration-rolebinding
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: ""
+  kind: ClusterRole
+  name: singaporegateway-cluster-registration
+subjects:
+- kind: ServiceAccount
+  name: cluster-registration-operator
+  namespace: cluster-registration-operator
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-registration-operator
+  namespace: cluster-registration-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"

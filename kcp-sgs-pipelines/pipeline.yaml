@@ -71,46 +71,32 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
-  # - name: configure-hypershift-azure
-  #   params:
-  #   - name: targetManagedCluster
-  #     value: test-cluster-aws
-  #   - name: hypershiftDeploymentName
-  #     value: test-cluster-azure-hd
-  #   runAfter:
-  #   - import-aws-spoke
-  #   taskRef:
-  #     kind: Task
-  #     name: deploy-kcp-hub-hyper-deployment-azure
-  #   workspaces:
-  #   - name: source
-  #     workspace: shared-workspace
-  # - name: deploy-observability
-  #   runAfter:
-  #   - ensure-mch
-  #   taskRef:
-  #     kind: Task
-  #     name: deploy-kcp-hub-deploy-observability
-  #   workspaces:
-  #   - name: source
-  #     workspace: shared-workspace
-  # - name: deploy-alertmanager-to-github
-  #   runAfter:
-  #   - ensure-mch
-  #   taskRef:
-  #     kind: Task
-  #     name: deploy-kcp-hub-deploy-alertmanager-to-github
-  #   workspaces:
-  #   - name: source
-  #     workspace: shared-workspace
-  # - name: deploy-alertmanager
-  #   runAfter:
-  #   - deploy-alertmanager-to-github
-  #   taskRef:
-  #     kind: Task
-  #     name: deploy-kcp-hub-deploy-alertmanager
-  #   workspaces:
-  #   - name: source
-  #     workspace: shared-workspace
+  - name: deploy-observability
+    runAfter:
+    - ensure-acm
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-deploy-observability
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: deploy-alertmanager-to-github
+    runAfter:
+    - ensure-acm
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-deploy-alertmanager-to-github
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: deploy-alertmanager
+    runAfter:
+    - deploy-alertmanager-to-github
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-deploy-alertmanager
+    workspaces:
+    - name: source
+      workspace: shared-workspace
   workspaces:
   - name: shared-workspace
