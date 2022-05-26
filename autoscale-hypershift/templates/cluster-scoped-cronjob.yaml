@@ -44,7 +44,7 @@ parameters:
     required: true
   - name: CURATOR_IMAGE
     description: HyperShift scaler curator image
-    value: quay.io/acm-sre/autoscale-hypershift:latest
+    value: quay.io/acm-sre/autoscale-hypershift:2.5.0
     required: true
   - name: NAMESPACE 
     description: The namespace where the scaledown CronJobs were installed

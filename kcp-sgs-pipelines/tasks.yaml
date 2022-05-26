@@ -5,7 +5,7 @@ metadata:
 spec:
   params:
   - name: clusterPoolName
-    default: hypershift-cluster-pool
+    default: kcp-sgs-hubs
     description: The name of the clusterpool to use
     type: string
   - name: clusterName
