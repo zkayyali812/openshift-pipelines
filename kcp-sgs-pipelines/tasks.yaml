@@ -60,7 +60,7 @@ spec:
       
       oc get secret -n ${NAMESPACE} ${KUBECONFIG_SECRET} -o yaml | yq eval '.data.kubeconfig' - | base64 -d > $(inputs.params.clusterName)-kubeconfig.yaml
       
-      _IMAGE_PULL_SECRET=$(oc get secret autoscale-hypershift-acm-pull-secret -o yaml | yq eval '.data.".dockerconfigjson"' -)
+      _IMAGE_PULL_SECRET=$(oc get secret kcp-sgs-pipelines-multiclusterhub-operator-pull-secret -o yaml | yq eval '.data.".dockerconfigjson"' -)
 
       mkdir -p /workspace/$(inputs.params.clusterName)/
       echo "$_USERNAME" > /workspace/$(inputs.params.clusterName)/USERNAME
@@ -222,151 +222,93 @@ spec:
 
 ---
 
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: deploy-kcp-hub-import-spoke
-spec:
-  params:
-  - name: clusterName
-    default: demo-claim
-    description: The name of the clusterclaim to use
-    type: string
-  steps:
-  - args:
-    - |-
-      #!/bin/bash
-      set -e
-
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
-      
-      echo "# Copyright Contributors to the Open Cluster Management project
-      managedCluster:
-        name: ""
-        addons:
-          applicationManager:
-            enabled: false
-            argocdCluster: false
-          policyController:
-            enabled: true
-          searchCollector:
-            enabled: false
-          certPolicyController:
-            enabled: false
-          iamPolicyController:
-            enabled: false
-        autoImportRetry: 5" > spokevalues.yaml
-
-      cm attach cluster --cluster $(inputs.params.clusterName) --cluster-kubeconfig $(inputs.params.clusterName)-kubeconfig.yaml --values spokevalues.yaml
-
-      echo "Spoke cluster successfully imported"
-      exit 0 
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
-    resources: {}
-    workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
 
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: deploy-kcp-hub-hyper-deployment-aws
+  name: deploy-kcp-hub-hypershift-deployments
 spec:
-  params:
-  - name: hypershiftDeploymentName
-    default: local-cluster
-    description: The namespace to deploy the hypershift deployment
-    type: string
-  - name: targetManagedCluster
-    default: local-cluster
-    description: The managedcluster to target to become a managementcluster
-    type: string
   steps:
-  - args:
+  - name: hypershift-prereqs
+    args:
     - |-
       #!/bin/bash
       set -e
 
       HYPERSHIFT_CREDS=$(oc get secret kcp-sgs-pipelines-hypershift-operator-oidc-provider-s3-credentials -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "hypershift-operator-oidc-provider-s3-credentials"' -)
-      ACM_AWS_CREDS=$(oc get secret kcp-sgs-pipelines-acm-aws-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "acm-credentials"' -)
+      ACM_AWS_CREDS=$(oc get secret kcp-sgs-pipelines-acm-aws-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "aws-credentials"' -)
+      ACM_AZR_CREDS=$(oc get secret kcp-sgs-pipelines-acm-azure-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "azr-credentials"' -)
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      echo "$HYPERSHIFT_CREDS" | oc apply -f - -n $(inputs.params.targetManagedCluster)
-      echo "$ACM_AWS_CREDS" | oc apply -f - -n $(inputs.params.targetManagedCluster)
+      echo "$HYPERSHIFT_CREDS" | oc apply -f - -n local-cluster
+      echo "$ACM_AWS_CREDS" | oc apply -f - -n local-cluster
+      echo "$ACM_AZR_CREDS" | oc apply -f - -n local-cluster
 
       echo "Applying HyperShift ManagedClusterAddon ..."
-      oc apply -f samples/kcp-sgs-pipelines/resources/hypershift-addon.yaml -n $(inputs.params.targetManagedCluster)
-      echo ""
+      oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/hypershift-addon.yaml -n local-cluster
+      echo "HyperShift prereqs installed"
 
-      oc project multicluster-engine
-      oc create ns clusters || true
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    resources: {}
+    workingDir: /workspace/source
+  - name: ensure-hypershift-deploys
+    args:
+    - |-
+      #!/bin/bash
+      set -e
 
-      echo "Creating AWS HyperShiftDeployment"
-      _TEMPLATE="apiVersion: cluster.open-cluster-management.io/v1alpha1
-      kind: HypershiftDeployment
-      metadata:
-        name: $(inputs.params.hypershiftDeploymentName)
-        namespace: $(inputs.params.targetManagedCluster)
-      spec:
-        hostingCluster: $(inputs.params.targetManagedCluster)
-        hostingNamespace: $(inputs.params.targetManagedCluster)
-        infrastructure:
-          cloudProvider:
-            name: acm-credentials
-          configure: True
-          platform:
-            aws:
-              region: us-east-2"
-      echo "$_TEMPLATE" | oc apply -f -
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
 
-      echo "Validating HostedCluster is imported hub"
+      echo "Applying HyperShiftDeployments ..."
+      oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/aws-hypershiftdeployment.yaml -n local-cluster
+      oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/azr-hypershiftdeployment.yaml -n local-cluster
+      echo "HyperShiftDeployments applied"
+
+      echo "Validating AWS HypershiftDeployment has completed"
       _ATTEMPTS=0
-      echo "Waiting for ManagedCluster to be created ..."
-      until oc get managedcluster | grep "$(inputs.params.hypershiftDeploymentName)";
+      until  oc get hd aws-hd -n local-cluster --no-headers | grep "Completed";
       do 
-        echo "$_ATTEMPTS/10: Waiting for HostedCluster ManagedCluster to be available... Sleeping 1 min"
+        echo "$_ATTEMPTS/60: HypershiftDeployment is not yet ready"
         _ATTEMPTS=$((_ATTEMPTS + 1))
         sleep 60;
-        if [[ $_ATTEMPTS == 10 ]]; then
-            echo "The managedcluster not come up in the allotted time"
+        if [[ $_ATTEMPTS == 60 ]]; then
+            echo "The HypershiftDeployment is not ready"
+            oc delete hd aws-hd -n local-cluster
             exit 1
         fi
       done
-      echo "HyperShiftDeployment is running on hub cluster"
+      echo "AWS HypershiftDeployment has completed successfully"
 
-      echo "Validating HyperShiftDeployment has Completed"
+      echo "Validating Azure HypershiftDeployment has completed"
       _ATTEMPTS=0
-      until  oc get hd $(inputs.params.hypershiftDeploymentName) -n $(inputs.params.targetManagedCluster) --no-headers | grep "Completed";
+      until  oc get hd azure-hd -n local-cluster --no-headers | grep "Completed";
       do 
         echo "$_ATTEMPTS/60: HostedCluster is not yet ready"
         _ATTEMPTS=$((_ATTEMPTS + 1))
         sleep 60;
         if [[ $_ATTEMPTS == 60 ]]; then
-            echo "The HyperShiftDeployment is not ready"
+            echo "The HypershiftDeployment is not ready"
+            oc delete hd azure-hd -n local-cluster
             exit 1
         fi
       done
-      echo "HyperShiftDeployment has completed successfully"
+      echo "Azure HypershiftDeployment has completed successfully"
 
-      exit 0
     command:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
   workspaces:
   - name: source
+
 
 ---
 
@@ -396,102 +338,6 @@ spec:
       oc apply -f samples/kcp-sgs-pipelines/resources/kcp-sgs-sre-rbac.yaml
       
       exit 0 
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
-    resources: {}
-    workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: deploy-kcp-hub-hyper-deployment-azure
-spec:
-  params:
-  - name: hypershiftDeploymentName
-    default: local-cluster
-    description: The namespace to deploy the hypershift deployment
-    type: string
-  - name: targetManagedCluster
-    default: local-cluster
-    description: The managedcluster to target to become a managementcluster
-    type: string
-  steps:
-  - args:
-    - |-
-      #!/bin/bash
-      set -e
-
-      HYPERSHIFT_CREDS=$(oc get secret kcp-sgs-pipelines-hypershift-operator-oidc-provider-s3-credentials -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "hypershift-operator-oidc-provider-s3-credentials"' -)
-      ACM_AZR_CREDS=$(oc get secret kcp-sgs-pipelines-acm-azure-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "azure-credentials"' -)
-
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
-
-      echo "$HYPERSHIFT_CREDS" | oc apply -f - -n $(inputs.params.targetManagedCluster)
-      echo "$ACM_AZR_CREDS" | oc apply -f - -n $(inputs.params.targetManagedCluster)
-
-      echo "Applying HyperShift ManagedClusterAddon ..."
-      oc apply -f samples/kcp-sgs-pipelines/resources/hypershift-addon.yaml -n $(inputs.params.targetManagedCluster)
-      echo ""
-
-      oc project multicluster-engine
-      oc create ns clusters || true
-
-      echo "Creating Azure HyperShiftDeployment"
-      _TEMPLATE="apiVersion: cluster.open-cluster-management.io/v1alpha1
-      kind: HypershiftDeployment
-      metadata:
-        name: $(inputs.params.hypershiftDeploymentName)
-        namespace: $(inputs.params.targetManagedCluster)
-      spec:
-        hostingCluster: $(inputs.params.targetManagedCluster)
-        hostingNamespace: $(inputs.params.targetManagedCluster)
-        infrastructure:
-          cloudProvider:
-            name: azure-credentials
-          configure: True
-          platform:
-            azure:
-              location: eastus2"
-      echo "$_TEMPLATE" | oc apply -f -
-
-      echo "Validating HostedCluster is imported hub"
-      _ATTEMPTS=0
-      echo "Waiting for ManagedCluster to be created ..."
-      until oc get managedcluster | grep "$(inputs.params.hypershiftDeploymentName)";
-      do 
-        echo "$_ATTEMPTS/10: Waiting for HostedCluster ManagedCluster to be available... Sleeping 1 min"
-        _ATTEMPTS=$((_ATTEMPTS + 1))
-        sleep 60;
-        if [[ $_ATTEMPTS == 10 ]]; then
-            echo "The managedcluster not come up in the allotted time"
-            exit 1
-        fi
-      done
-      echo "HyperShiftDeployment is running on hub cluster"
-
-      echo "Validating HyperShiftDeployment has Completed"
-      _ATTEMPTS=0
-      until  oc get hd $(inputs.params.hypershiftDeploymentName) -n $(inputs.params.targetManagedCluster) --no-headers | grep "Completed";
-      do 
-        echo "$_ATTEMPTS/60: HostedCluster is not yet ready"
-        _ATTEMPTS=$((_ATTEMPTS + 1))
-        sleep 60;
-        if [[ $_ATTEMPTS == 60 ]]; then
-            echo "The HyperShiftDeployment is not ready"
-            exit 1
-        fi
-      done
-      echo "HyperShiftDeployment has completed successfully"
-
-      exit 0
     command:
     - /bin/bash
     - -c

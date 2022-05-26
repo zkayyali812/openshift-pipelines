@@ -62,46 +62,15 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
-  # - name: checkout-aws-spoke
-  #   params:
-  #   - name: clusterName
-  #     value: test-cluster-aws
-  #   - name: clusterPoolName
-  #     value: hypershift-cluster-pool
-  #   runAfter:
-  #   - ensure-mch
-  #   taskRef:
-  #     kind: Task
-  #     name: deploy-kcp-hub-checkout-cluster
-  #   workspaces:
-  #   - name: source
-  #     workspace: shared-workspace
-  # - name: import-aws-spoke
-  #   params:
-  #   - name: clusterName
-  #     value: test-cluster-aws
-  #   runAfter:
-  #   - checkout-aws-spoke
-  #   taskRef:
-  #     kind: Task
-  #     name: deploy-kcp-hub-import-spoke
-  #   workspaces:
-  #   - name: source
-  #     workspace: shared-workspace
-  # - name: configure-hypershift-aws
-  #   params:
-  #   - name: targetManagedCluster
-  #     value: test-cluster-aws
-  #   - name: hypershiftDeploymentName
-  #     value: test-cluster-aws-hd
-  #   runAfter:
-  #   - import-aws-spoke
-  #   taskRef:
-  #     kind: Task
-  #     name: deploy-kcp-hub-hyper-deployment-aws
-  #   workspaces:
-  #   - name: source
-  #     workspace: shared-workspace
+  - name: configure-hypershift
+    runAfter:
+    - ensure-acm
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-hypershift-deployments
+    workspaces:
+    - name: source
+      workspace: shared-workspace
   # - name: configure-hypershift-azure
   #   params:
   #   - name: targetManagedCluster
