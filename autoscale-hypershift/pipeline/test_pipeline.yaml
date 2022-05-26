@@ -66,5 +66,14 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
+  - name: apply-hypershiftdeployments
+    runAfter:
+    - ensure-acm
+    taskRef:
+      kind: Task
+      name: autoscale-hypershift-apply-hypershiftdeployments
+    workspaces:
+    - name: source
+      workspace: shared-workspace
   workspaces:
   - name: shared-workspace

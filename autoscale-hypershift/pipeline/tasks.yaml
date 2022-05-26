@@ -219,3 +219,43 @@ spec:
     workingDir: /workspace/source
   workspaces:
   - name: source
+
+---
+
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: autoscale-hypershift-apply-hypershiftdeployments
+spec:
+  steps:
+  - name: hypershift-prereqs
+    args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      HYPERSHIFT_CREDS=$(oc get secret autoscale-hypershift-aws-s3-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "hypershift-operator-oidc-provider-s3-credentials"' -)
+      ACM_AWS_CREDS=$(oc get secret autoscale-hypershift-acm-aws-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "aws-credentials"' -)
+      ACM_AZR_CREDS=$(oc get secret autoscale-hypershift-acm-azure-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "azure-credentials"' -)
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      echo "$HYPERSHIFT_CREDS" | oc apply -f - -n local-cluster
+      echo "$ACM_AZR_CREDS" | oc apply -f - -n local-cluster
+      echo "$ACM_AWS_CREDS" | oc apply -f - -n local-cluster
+
+      echo "Applying HyperShift ManagedClusterAddon ..."
+      oc apply -f samples/autoscale-hypershift/pipeline/resources/argo-rbac.yaml -n local-cluster
+      echo ""
+
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
