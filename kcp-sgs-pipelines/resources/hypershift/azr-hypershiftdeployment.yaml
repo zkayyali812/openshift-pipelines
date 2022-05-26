@@ -1,0 +1,15 @@
+apiVersion: cluster.open-cluster-management.io/v1alpha1
+kind: HypershiftDeployment
+metadata:
+  name: azure-hd
+  namespace: local-cluster
+spec:
+  hostingCluster: local-cluster
+  hostingNamespace: local-cluster
+  infrastructure:
+    cloudProvider:
+      name: azure-credentials
+    configure: True
+    platform:
+      azure:
+        location: eastus2
