@@ -266,40 +266,40 @@ spec:
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      echo "Applying HyperShiftDeployments ..."
+      echo "Applying Hypershiftdeployment ..."
       oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/aws-hypershiftdeployment.yaml -n local-cluster
       oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/azr-hypershiftdeployment.yaml -n local-cluster
-      echo "HyperShiftDeployments applied"
+      echo "Hypershiftdeployments applied"
 
-      echo "Validating AWS HypershiftDeployment has completed"
+      echo "Validating AWS Hypershiftdeployment has completed"
       _ATTEMPTS=0
       until  oc get hd aws-hd -n local-cluster --no-headers | grep "Completed";
       do 
-        echo "$_ATTEMPTS/60: HypershiftDeployment is not yet ready"
+        echo "$_ATTEMPTS/60: AWS Hypershiftdeployment is not yet ready"
         _ATTEMPTS=$((_ATTEMPTS + 1))
         sleep 60;
         if [[ $_ATTEMPTS == 60 ]]; then
-            echo "The HypershiftDeployment is not ready"
+            echo "The Hypershiftdeployment is not ready"
             oc delete hd aws-hd -n local-cluster
             exit 1
         fi
       done
-      echo "AWS HypershiftDeployment has completed successfully"
+      echo "AWS Hypershiftdeployment has completed successfully"
 
-      echo "Validating Azure HypershiftDeployment has completed"
+      echo "Validating Azure Hypershiftdeployment has completed"
       _ATTEMPTS=0
       until  oc get hd azure-hd -n local-cluster --no-headers | grep "Completed";
       do 
-        echo "$_ATTEMPTS/60: HostedCluster is not yet ready"
+        echo "$_ATTEMPTS/60: Azure Hypershiftdeployment is not yet ready"
         _ATTEMPTS=$((_ATTEMPTS + 1))
         sleep 60;
         if [[ $_ATTEMPTS == 60 ]]; then
-            echo "The HypershiftDeployment is not ready"
+            echo "The Hypershiftdeployment is not ready"
             oc delete hd azure-hd -n local-cluster
             exit 1
         fi
       done
-      echo "Azure HypershiftDeployment has completed successfully"
+      echo "Azure Hypershiftdeployment has completed successfully"
 
     command:
     - /bin/bash
@@ -425,7 +425,7 @@ spec:
 
       echo "Alertmanager to Github is deployed"
 
-      exit 0 
+      exit 0
     command:
     - /bin/bash
     - -c

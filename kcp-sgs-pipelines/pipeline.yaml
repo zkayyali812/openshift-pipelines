@@ -41,7 +41,7 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: configure-hub-idp
+  - name: configure-idp
     runAfter:
     - checkout-cluster
     taskRef:

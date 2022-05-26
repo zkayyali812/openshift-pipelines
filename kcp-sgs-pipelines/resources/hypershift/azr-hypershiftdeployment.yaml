@@ -8,7 +8,7 @@ spec:
   hostingNamespace: local-cluster
   infrastructure:
     cloudProvider:
-      name: azure-credentials
+      name: azr-credentials
     configure: True
     platform:
       azure:
