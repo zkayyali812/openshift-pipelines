@@ -31,8 +31,6 @@ spec:
     taskRef:
       kind: ClusterTask
       name: buildah
-    runAfter:
-    - fetch-repository
     params:
     - name: IMAGE
       value: "quay.io/acm-sre/autoscale-hypershift:test"
@@ -52,40 +50,16 @@ spec:
       name: autoscale-hypershift-checkout-cluster
     runAfter:
     - build-test-image
+    - fetch-repository
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: login-to-cluster
-    params:
-    - name: username
-      value: "$(tasks.checkout-cluster.results.username)"
-    - name: password
-      value: "$(tasks.checkout-cluster.results.password)"
-    - name: api
-      value: "$(tasks.checkout-cluster.results.api)"
-    taskRef:
-      kind: Task
-      name: autoscale-hypershift-login-to-cluster
-    runAfter:
-      - checkout-cluster
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: ensure-acm-prereqs
+  - name: ensure-acm
     params:
     - name: imagePullSecret
       value: "$(tasks.checkout-cluster.results.imagePullSecret)"
     runAfter:
-    - login-to-cluster
-    taskRef:
-      kind: Task
-      name: autoscale-hypershift-ensure-acm-prereqs
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: ensure-acm-subscription
-    runAfter:
-    - ensure-acm-prereqs
+    - checkout-cluster
     taskRef:
       kind: Task
       name: autoscale-hypershift-ensure-acm

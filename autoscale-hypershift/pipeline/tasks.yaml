@@ -22,7 +22,8 @@ spec:
   - name: imagePullSecret
     description: The imagePullSecret on the hub cluster.
   steps:
-  - args:
+  - name: checkout-cluster
+    args:
     - |-
       #!/bin/bash
       set -e
@@ -61,9 +62,12 @@ spec:
       
       _IMAGE_PULL_SECRET=$(oc get secret autoscale-hypershift-acm-pull-secret -o yaml | yq eval '.data.".dockerconfigjson"' -)
 
-      echo "$_USERNAME" | tr -d '\n' > $(results.username.path)
-      echo "$_PASSWORD" | tr -d '\n' > $(results.password.path)
-      echo "$_API_URL" | tr -d '\n' > $(results.api.path)
+      mkdir -p /workspace/autoscale-hypershift-ci-test/
+      echo "$_USERNAME" > /workspace/$(inputs.params.clusterName)/USERNAME
+      echo "$_PASSWORD" > /workspace/$(inputs.params.clusterName)/PASSWORD
+      echo "$_API_URL" > /workspace/$(inputs.params.clusterName)/API_URL
+      echo "$_IMAGE_PULL_SECRET" > /workspace/$(inputs.params.clusterName)/IMAGE_PULL_SECRET
+
       echo "$_IMAGE_PULL_SECRET" | tr -d '\n' > $(results.imagePullSecret.path)
 
       echo "API URL of claimed cluster: $_API_URL"
@@ -75,39 +79,20 @@ spec:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: autoscale-hypershift-login-to-cluster
-spec:
-  params:
-  - name: username
-    default: kubeadmin
-    description: The username of the claimed cluster
-    type: string
-  - name: password
-    default: password
-    description: The password of the claimed cluster
-    type: string
-  - name: api
-    default: https://api.openshift.com
-    description: The claimed cluster API URL
-    type: string
-  steps:
-  - args:
+  - name: login
+    args:
     - |-
       #!/bin/bash
       set -e
+
+      export _USERNAME=$(cat /workspace/$(inputs.params.clusterName)/USERNAME)
+      export _PASSWORD=$(cat /workspace/$(inputs.params.clusterName)/PASSWORD)
+      export _API_URL=$(cat /workspace/$(inputs.params.clusterName)/API_URL)
+      export _IMAGE_PULL_SECRET=$(cat /workspace/$(inputs.params.clusterName)/IMAGE_PULL_SECRET)
       
-      LOGINCMD="oc login $(inputs.params.api) -u $(inputs.params.username) -p $(inputs.params.password) --insecure-skip-tls-verify=true"
+      LOGINCMD="oc login ${_API_URL} -u ${_USERNAME} -p ${_PASSWORD} --insecure-skip-tls-verify=true"
       eval $LOGINCMD
       
       echo $LOGINCMD > login.sh
@@ -117,7 +102,6 @@ spec:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
   workspaces:
@@ -128,7 +112,7 @@ spec:
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: autoscale-hypershift-ensure-acm-prereqs
+  name: autoscale-hypershift-ensure-acm
 spec:
   params:
   - name: imagePullSecret
@@ -136,13 +120,16 @@ spec:
     description: The image pull secret used to deploy the catalogsources. Copied from clusterPoolNamespace
     type: string
   steps:
-  - args:
+  - name: ensure-prereqs
+    args:
     - |-
       #!/bin/bash
       set -e
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
+
+      oc project
 
       echo "Creating Namespace..."
       oc create namespace open-cluster-management --dry-run=client -o yaml | oc apply -f -
@@ -195,21 +182,10 @@ spec:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: autoscale-hypershift-ensure-acm
-spec:
-  steps:
-  - args:
+  - name: ensure-acm
+    args:
     - |-
       #!/bin/bash
       set -e
@@ -238,7 +214,6 @@ spec:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
   workspaces:
