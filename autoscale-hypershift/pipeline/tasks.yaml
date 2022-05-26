@@ -201,7 +201,7 @@ spec:
       do 
           echo "Attempt: ${_ATTEMPTS}/60 - Waiting for MCH to enter a Running state"
           _ATTEMPTS=$((_ATTEMPTS + 1))
-          sleep 15;
+          sleep 60;
           if [[ $_ATTEMPTS == 60 ]]; then
               echo "Failed to install the MCH in allotted time"
               exit 1
@@ -237,19 +237,49 @@ spec:
 
       HYPERSHIFT_CREDS=$(oc get secret autoscale-hypershift-aws-s3-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "hypershift-operator-oidc-provider-s3-credentials"' -)
       ACM_AWS_CREDS=$(oc get secret autoscale-hypershift-acm-aws-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "aws-credentials"' -)
-      ACM_AZR_CREDS=$(oc get secret autoscale-hypershift-acm-azure-creds -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "azure-credentials"' -)
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
       echo "$HYPERSHIFT_CREDS" | oc apply -f - -n local-cluster
-      echo "$ACM_AZR_CREDS" | oc apply -f - -n local-cluster
       echo "$ACM_AWS_CREDS" | oc apply -f - -n local-cluster
 
       echo "Applying HyperShift ManagedClusterAddon ..."
-      oc apply -f samples/autoscale-hypershift/pipeline/resources/argo-rbac.yaml -n local-cluster
-      echo ""
+      oc apply -f samples/autoscale-hypershift/pipeline/resources/hypershift-addon.yaml -n local-cluster
+      echo "HyperShift prereqs installed"
 
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    resources: {}
+    workingDir: /workspace/source
+  - name: ensure-hypershift-deploys
+    args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      echo "Applying HyperShiftDeployments ..."
+      oc apply -f samples/autoscale-hypershift/pipeline/resources/aws-hypershiftdeployment.yaml -n local-cluster
+      echo "HyperShiftDeployments installed"
+
+      echo "Validating HyperShiftDeployment has Completed"
+      _ATTEMPTS=0
+      until  oc get hd aws-hd -n local-cluster --no-headers | grep "Completed";
+      do 
+        echo "$_ATTEMPTS/60: HostedCluster is not yet ready"
+        _ATTEMPTS=$((_ATTEMPTS + 1))
+        sleep 60;
+        if [[ $_ATTEMPTS == 60 ]]; then
+            echo "The HyperShiftDeployment is not ready"
+            exit 1
+        fi
+      done
+      echo "HyperShiftDeployment has completed successfully"
 
     command:
     - /bin/bash

@@ -31,6 +31,8 @@ spec:
     taskRef:
       kind: ClusterTask
       name: buildah
+    runAfter:
+    - fetch-repository
     params:
     - name: IMAGE
       value: "quay.io/acm-sre/autoscale-hypershift:test"
