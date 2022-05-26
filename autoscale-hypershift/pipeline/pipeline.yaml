@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-and-push-autoscale-hypershift-image
+spec:
+  params:
+  - name: quayTag
+    type: string
+    description: The name of the clusterclaim to create
+    default: "quay.io/acm-sre/autoscale-hypershift:2.5.0"
+  tasks:
+  - name: fetch-repository
+    params:
+    - name: url
+      value: https://github.com/stolostron/openshift-pipelines.git
+    - name: revision
+      value: main
+    - name: deleteExisting
+      value: "true"
+    - name: subdirectory
+      value: "samples"
+    - name: gitInitImage
+      value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:afc5d3f9efe26c7042635d43b8ffd09d67936e3d0b6b901dc08a33e20313d361
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+  - name: build
+    taskRef:
+      kind: ClusterTask
+      name: buildah
+    runAfter:
+    - fetch-repository
+    params:
+    - name: IMAGE
+      value: "$(params.quayTag)"
+    - name: CONTEXT
+      value: samples/autoscale-hypershift/
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  workspaces:
+  - name: shared-workspace

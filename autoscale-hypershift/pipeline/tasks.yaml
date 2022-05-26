@@ -1,0 +1,242 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: autoscale-hypershift-checkout-cluster
+spec:
+  params:
+  - name: clusterPoolName
+    default: hypershift-cluster-pool
+    description: The name of the clusterpool to use
+    type: string
+  - name: clusterName
+    default: demo-claim
+    description: The name of the clusterclaim to use
+    type: string
+  results:
+  - name: username
+    description: Username for the claimed cluster.
+  - name: password
+    description: Password for the claimed cluster.  
+  - name: api
+    description: API URL of the claimed cluster.
+  - name: imagePullSecret
+    description: The imagePullSecret on the hub cluster.
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+      
+      _TEMPLATE="apiVersion: hive.openshift.io/v1
+      kind: ClusterClaim
+      metadata:
+        annotations:
+          cluster.open-cluster-management.io/createmanagedcluster: 'false'
+        name: $(inputs.params.clusterName)
+      spec:
+        clusterPoolName: $(inputs.params.clusterPoolName)
+        subjects:
+        - apiGroup: rbac.authorization.k8s.io
+          kind: Group
+          name: idp-for-the-masses
+        - apiGroup: rbac.authorization.k8s.io
+          kind: Group
+          name: system:serviceaccounts:managed-services"
+
+      echo "$_TEMPLATE" | oc apply -f -
+
+      oc wait --for=condition=ClusterRunning clusterclaim.hive/$(inputs.params.clusterName) --timeout=90m
+
+      NAMESPACE=$(oc get clusterclaim.hive $(inputs.params.clusterName) -o=jsonpath='{.spec.namespace}')
+      CD_INFO=$(oc get clusterdeployment ${NAMESPACE} -n ${NAMESPACE} -o yaml -o=jsonpath='{.spec.clusterMetadata.adminPasswordSecretRef.name}')
+      KUBECONFIG_SECRET=$(oc get cd ${NAMESPACE} -n ${NAMESPACE} -o yaml | yq eval '.spec.clusterMetadata.adminKubeconfigSecretRef.name' -)
+
+      oc patch clusterdeployment ${NAMESPACE} -n ${NAMESPACE} --type json -p '[{"op": "add", "path": "/metadata/labels/hibernate", "value": "skip"}]'
+
+      _USERNAME=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.username}' | base64 -d )
+      _PASSWORD=$(oc get secret ${CD_INFO} -n ${NAMESPACE} -o jsonpath='{.data.password}' | base64 -d  )
+      _API_URL=$(oc get cd ${NAMESPACE} -n ${NAMESPACE} -o jsonpath='{.status.apiURL}' )
+      
+      oc get secret -n ${NAMESPACE} ${KUBECONFIG_SECRET} -o yaml | yq eval '.data.kubeconfig' - | base64 -d > $(inputs.params.clusterName)-kubeconfig.yaml
+      
+      _IMAGE_PULL_SECRET=$(oc get secret autoscale-hypershift-acm-pull-secret -o yaml | yq eval '.data.".dockerconfigjson"' -)
+
+      echo "$_USERNAME" | tr -d '\n' > $(results.username.path)
+      echo "$_PASSWORD" | tr -d '\n' > $(results.password.path)
+      echo "$_API_URL" | tr -d '\n' > $(results.api.path)
+      echo "$_IMAGE_PULL_SECRET" | tr -d '\n' > $(results.imagePullSecret.path)
+
+      echo "API URL of claimed cluster: $_API_URL"
+      echo "Password for the claimed cluster: $_PASSWORD"
+      echo ""
+      echo "Clusterclaim successfully checked out"
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: autoscale-hypershift-login-to-cluster
+spec:
+  params:
+  - name: username
+    default: kubeadmin
+    description: The username of the claimed cluster
+    type: string
+  - name: password
+    default: password
+    description: The password of the claimed cluster
+    type: string
+  - name: api
+    default: https://api.openshift.com
+    description: The claimed cluster API URL
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+      
+      LOGINCMD="oc login $(inputs.params.api) -u $(inputs.params.username) -p $(inputs.params.password) --insecure-skip-tls-verify=true"
+      eval $LOGINCMD
+      
+      echo $LOGINCMD > login.sh
+      echo $LOGINCMD
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: autoscale-hypershift-ensure-acm-prereqs
+spec:
+  params:
+  - name: imagePullSecret
+    default: ""
+    description: The image pull secret used to deploy the catalogsources. Copied from clusterPoolNamespace
+    type: string
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      echo "Creating Namespace..."
+      oc create namespace open-cluster-management --dry-run=client -o yaml | oc apply -f -
+      
+      echo "Creating ImagePullSecret..."
+      _TEMPLATE="apiVersion: v1
+      data:
+        .dockerconfigjson: $(inputs.params.imagePullSecret)
+      kind: Secret
+      metadata:
+        name: acm-pull-secret
+      type: kubernetes.io/dockerconfigjson"
+      echo "$_TEMPLATE" | oc apply -n open-cluster-management -f  -
+      echo "$_TEMPLATE" | oc apply -n openshift-marketplace -f -
+
+      oc apply -f samples/autoscale-hypershift/pipeline/resources/openshift-gitops-sub.yaml
+
+      echo "Creating OpenShift Gitops Subscription ..."
+      _ATTEMPTS=0
+      until oc get sub openshift-gitops-operator -n openshift-operators -o jsonpath='{.status.currentCSV}' | grep -q "openshift-gitops-operator";
+      do 
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          echo "Attempt: ${_ATTEMPTS}/5 - Waiting for CSV"
+          sleep 5;
+          if [[ $_ATTEMPTS == 5 ]]; then
+              echo "Failed to find the CSV in allotted time"
+              exit 1
+          fi
+      done
+      echo "OpenShift GitOps CSV has been created"
+      echo ""
+      _CURRENT_CSV=$(oc get sub openshift-gitops-operator -n openshift-operators -o jsonpath='{.status.currentCSV}')
+      
+      _ATTEMPTS=0 
+      until oc get csv ${_CURRENT_CSV} -n openshift-operators -o jsonpath='{.status.phase}' | grep "Succeeded";
+      do 
+          echo "Attempt: ${_ATTEMPTS}/15 - Waiting for CSV installation to complete"
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          sleep 15;
+          if [[ $_ATTEMPTS == 15 ]]; then
+              echo "The CSV failed to install in the allotted time"
+              exit 1
+          fi
+      done
+
+      echo "OpenShift Gitops subscription installation has succeeded"
+
+      # echo "Creating ACM CatalogSource..."
+
+      # _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
+      # kind: CatalogSource
+      # metadata:
+      #   name: acm-custom-registry
+      #   namespace: openshift-marketplace
+      # spec:
+      #   displayName: Advanced Cluster Management
+      #   image: quay.io/acm-d/acm-custom-registry:$(inputs.params.snapshot)
+      #   publisher: Red Hat
+      #   sourceType: grpc
+      #   updateStrategy:
+      #     registryPoll:
+      #       interval: 10m
+      #   secrets:
+      #   - acm-pull-secret"
+      # echo "$_TEMPLATE" | oc apply -f -
+
+      # echo "Creating MCE CatalogSource..."
+
+      # _TEMPLATE="apiVersion: operators.coreos.com/v1alpha1
+      # kind: CatalogSource
+      # metadata:
+      #   name: multiclusterengine-catalog
+      #   namespace: openshift-marketplace
+      # spec:
+      #   displayName: MultiCluster Engine
+      #   image: quay.io/acm-d/mce-custom-registry:$(inputs.params.snapshot)
+      #   publisher: Red Hat
+      #   sourceType: grpc
+      #   updateStrategy:
+      #     registryPoll:
+      #       interval: 10m
+      #   secrets:
+      #   - acm-pull-secret"
+      # echo "$_TEMPLATE" | oc apply -f -
+
+      echo "Created ACM Prereqs successfully."
+      exit 0
+
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
