@@ -7,7 +7,7 @@ spec:
   - name: clusterName
     type: string
     description: The name of the clusterclaim to create
-    default: "test-kcp-hub"
+    default: "acm-kcp-hub"
   tasks:
   - name: fetch-repository
     params:
@@ -32,7 +32,7 @@ spec:
     - fetch-repository
     params:
     - name: clusterPoolName
-      value: hypershift-cluster-pool
+      value: kcp-sgs-hubs
     - name: clusterName
       value: "$(params.clusterName)"
     taskRef:

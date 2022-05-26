@@ -328,8 +328,6 @@ spec:
       make scale-up
       make cronjobs
 
-      
-
     command:
     - /bin/bash
     - -c
