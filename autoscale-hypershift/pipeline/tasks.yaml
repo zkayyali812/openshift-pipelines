@@ -194,7 +194,8 @@ spec:
       eval "$_LOGIN_CMD"
 
       oc apply -f samples/autoscale-hypershift/pipeline/resources/acm-argo.yaml
-
+      oc apply -f samples/autoscale-hypershift/pipeline/resources/argo-rbac.yaml
+      
       _ATTEMPTS=0
       until oc get mch multiclusterhub -n open-cluster-management -o jsonpath={'.status.phase'} | grep "Running";
       do 
