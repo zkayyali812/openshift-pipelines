@@ -74,10 +74,9 @@ spec:
   - name: ensure-acm-prereqs
     params:
     - name: imagePullSecret
-      value: "$(tasks.checkout-hub-cluster.results.imagePullSecret)"
+      value: "$(tasks.checkout-cluster.results.imagePullSecret)"
     runAfter:
-    - login-to-hub
-    - fetch-repo-samples
+    - login-to-cluster
     taskRef:
       kind: Task
       name: autoscale-hypershift-ensure-acm-prereqs
@@ -85,14 +84,11 @@ spec:
     - name: source
       workspace: shared-workspace
   - name: ensure-acm-subscription
-    params:
-    - name: snapshot
-      value: "$(params.downstreamSnapshot)"
     runAfter:
     - ensure-acm-prereqs
     taskRef:
       kind: Task
-      name: deploy-kcp-hub-acm-apply-sub
+      name: autoscale-hypershift-ensure-acm
     workspaces:
     - name: source
       workspace: shared-workspace
