@@ -1,0 +1,100 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: test-build-and-push-autoscale-hypershift
+spec:
+  params:
+  - name: quayTag
+    type: string
+    description: The name of the clusterclaim to create
+    default: "quay.io/acm-sre/autoscale-hypershift:2.5.0"
+  tasks:
+  - name: fetch-repository
+    params:
+    - name: url
+      value: https://github.com/stolostron/openshift-pipelines.git
+    - name: revision
+      value: main
+    - name: deleteExisting
+      value: "true"
+    - name: subdirectory
+      value: "samples"
+    - name: gitInitImage
+      value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:afc5d3f9efe26c7042635d43b8ffd09d67936e3d0b6b901dc08a33e20313d361
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+  - name: build-test-image
+    taskRef:
+      kind: ClusterTask
+      name: buildah
+    runAfter:
+    - fetch-repository
+    params:
+    - name: IMAGE
+      value: "quay.io/acm-sre/autoscale-hypershift:test"
+    - name: CONTEXT
+      value: samples/autoscale-hypershift/
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: checkout-cluster
+    params:
+    - name: clusterPoolName
+      value: hypershift-cluster-pool
+    - name: clusterName
+      value: "autoscale-hypershift-ci-test"
+    taskRef:
+      kind: Task
+      name: autoscale-hypershift-checkout-cluster
+    runAfter:
+    - build-test-image
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: login-to-cluster
+    params:
+    - name: username
+      value: "$(tasks.checkout-cluster.results.username)"
+    - name: password
+      value: "$(tasks.checkout-cluster.results.password)"
+    - name: api
+      value: "$(tasks.checkout-cluster.results.api)"
+    taskRef:
+      kind: Task
+      name: autoscale-hypershift-login-to-cluster
+    runAfter:
+      - checkout-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-acm-prereqs
+    params:
+    - name: imagePullSecret
+      value: "$(tasks.checkout-hub-cluster.results.imagePullSecret)"
+    runAfter:
+    - login-to-hub
+    - fetch-repo-samples
+    taskRef:
+      kind: Task
+      name: autoscale-hypershift-ensure-acm-prereqs
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-acm-subscription
+    params:
+    - name: snapshot
+      value: "$(params.downstreamSnapshot)"
+    runAfter:
+    - ensure-acm-prereqs
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-acm-apply-sub
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  workspaces:
+  - name: shared-workspace

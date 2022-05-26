@@ -24,15 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const HypershiftScalerSA = true
-const ClusterInstallerSA = false
-
-//  patchStringValue specifies a json patch operation for a string.
-type patchStringValue struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
-	Value string `json:"value"`
-}
+const AutoscaleHypershiftSA = true
 
 // Simple error function
 func checkError(err error) {
@@ -80,7 +72,6 @@ func scaleHyperShiftDeploymentsUpdate(client dynamic.Interface, hd *hyperdeployv
 }
 
 // Used to create events for hypershiftdeployment scaling actions
-//objName, namespaceName, objKind, eventName, message, reason, eType, api_core
 func fireEvent(client dynamic.Interface, hd *hyperdeployv1alpha1.HypershiftDeployment, eventName string, message string, reason string, eType string) {
 	unstructuredEvent, err := client.Resource(eventRes).Namespace(hd.Namespace).Get(context.TODO(), fmt.Sprintf("%s-%s", eventName, hd.Name), metav1.GetOptions{})
 	event := &corev1.Event{}
@@ -152,22 +143,23 @@ func main() {
 	homePath := os.Getenv("HOME") // Used to look for .kube/config
 
 	var config *rest.Config
-	var err error
 	if _, err := os.Stat(homePath + "/.kube/config"); !os.IsNotExist(err) {
 		fmt.Println("Connecting with local kubeconfig")
 		config, err = clientcmd.BuildConfigFromFlags("", userConfig())
+		checkError(err)
+
 	} else {
 		fmt.Println("Connecting using In Cluster Config")
 		config, err = rest.InClusterConfig()
+		checkError(err)
 	}
-	checkError(err)
+
 	client, err := dynamic.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
 	podNamespace := os.Getenv("POD_NAMESPACE")
-	fmt.Println(podNamespace)
 	unstructuredHyperDeploys, err := client.Resource(hypershiftDeploymentRes).Namespace(podNamespace).List(context.TODO(), metav1.ListOptions{})
 	checkError(err)
 
@@ -176,7 +168,7 @@ func main() {
 		convertUnstructuredToHypershiftDeployment(unstructuredHyperdeploy, hd)
 
 		if (OptIn == "true" && hd.Labels["autoscale-hypershift"] == "true") || (OptIn != "true" && hd.Labels["autoscale-hypershift"] != "skip") {
-			takeAction(client, hd, TakeAction, HypershiftScalerSA)
+			takeAction(client, hd, TakeAction, AutoscaleHypershiftSA)
 		} else {
 			fmt.Println("Skip: " + hd.Name + "  (currently " + string(hd.Labels["autoscale-hypershift"]) + ")")
 			fireEvent(client, hd, "autoscale-hypershift", "Skipping cluster "+hd.Name, "skipAction", "Normal")
@@ -185,32 +177,27 @@ func main() {
 	}
 }
 
-func takeAction(client dynamic.Interface, hd *hyperdeployv1alpha1.HypershiftDeployment, takeAction string, HypershiftScalerSA bool) {
+func takeAction(client dynamic.Interface, hd *hyperdeployv1alpha1.HypershiftDeployment, takeAction string, AutoscaleHypershiftSA bool) {
 	if hd.Labels["autoscale-hypershift-currentaction"] != takeAction {
-
 		fmt.Printf("Taking Action: %s on hd: %s\n", takeAction, hd.Name)
 
-		var newState string
-		newState = scaleHyperShiftDeploymentsUpdate(client, hd, takeAction)
-		fmt.Println("NewState: " + newState)
+		newState := scaleHyperShiftDeploymentsUpdate(client, hd, takeAction)
 
 		// Check the new state and report a response
 		if newState == takeAction {
 			fmt.Println("  ✓")
-			if HypershiftScalerSA {
+			if AutoscaleHypershiftSA {
 				fireEvent(client, hd, "autoscale-hypershift", "The hypershiftdeployment "+hd.Name+" is taking action: "+takeAction, takeAction, "Normal")
 			}
 		} else {
 			fmt.Println("  X")
-
-			if HypershiftScalerSA {
+			if AutoscaleHypershiftSA {
 				fireEvent(client, hd, "autoscale-hypershift", "The cluster "+hd.Name+" did not set state to "+takeAction, "failedScaleDown", "Warning")
 			}
 		}
 	} else {
 		fmt.Println("Skip: " + hd.Name + "  (currently " + string(hd.Labels["autoscale-hypershift-currentaction"]) + ")")
-
-		if HypershiftScalerSA {
+		if AutoscaleHypershiftSA {
 			fireEvent(client, hd, "autoscale-hypershift", "Skipping cluster "+hd.Name+", requested state "+takeAction+" equals current state "+string(hd.Labels["autoscale-hypershift-currentaction"]), "skipScaleDown", "Normal")
 		}
 	}
@@ -219,14 +206,12 @@ func takeAction(client dynamic.Interface, hd *hyperdeployv1alpha1.HypershiftDepl
 func userConfig() string {
 	usr, err := user.Current()
 	checkError(err)
-
 	return filepath.Join(usr.HomeDir, ".kube", "config")
 }
 
 func convertUnstructuredToHypershiftDeployment(unstructuredObj unstructured.Unstructured, hd *hyperdeployv1alpha1.HypershiftDeployment) {
 	byteHyperDeploy, err := yaml.Marshal(unstructuredObj.Object)
 	checkError(err)
-
 	err = yaml.Unmarshal(byteHyperDeploy, hd)
 	checkError(err)
 }
@@ -234,7 +219,6 @@ func convertUnstructuredToHypershiftDeployment(unstructuredObj unstructured.Unst
 func convertHypershiftDeploymentToUnstructured(hd *hyperdeployv1alpha1.HypershiftDeployment, unstructuredObj *unstructured.Unstructured) {
 	bytesHD, err := yaml.Marshal(hd)
 	checkError(err)
-
 	err = yaml.Unmarshal(bytesHD, unstructuredObj)
 	checkError(err)
 }
@@ -245,7 +229,6 @@ func convertUnstructuredToEvent(unstructuredEvent *unstructured.Unstructured, ev
 	}
 	bytesEvent, err := yaml.Marshal(unstructuredEvent.Object)
 	checkError(err)
-
 	err = yaml.Unmarshal(bytesEvent, event)
 	checkError(err)
 }
@@ -253,7 +236,6 @@ func convertUnstructuredToEvent(unstructuredEvent *unstructured.Unstructured, ev
 func convertEventToUnstructured(event *corev1.Event, updatedUnstructuredEvent *unstructured.Unstructured) {
 	bytesEvent, err := yaml.Marshal(event)
 	checkError(err)
-
 	err = yaml.Unmarshal(bytesEvent, updatedUnstructuredEvent)
 	checkError(err)
 }
