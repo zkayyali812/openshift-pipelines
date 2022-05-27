@@ -20,12 +20,13 @@ spec:
       serviceAccountName: kcp-ocm-integration-controller-sa
       containers:
       - name: kcp-ocm-integration-controller
-        image: quay.io/skeeey/kcp-ocm-integration-controller:kcp-release-0.4
+        image: quay.io/skeeey/kcp-ocm-integration-controller:2.5.0-0eef12ba27c3353b10df9d83fb2a90c406300783
         args:
           - "/kcp-ocm"
           - "manager"
           - "--disable-leader-election"
           - "--kcp-kubeconfig=/var/kcp-ocm/kcp/admin.kubeconfig"
+          - "-v=4"
         volumeMounts:
         - name: kcp-admin-kubeconfig
           mountPath: "/var/kcp-ocm/kcp"
