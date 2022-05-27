@@ -190,12 +190,17 @@ spec:
       #!/bin/bash
       set -e
 
+      KCP_KUBECONFIG=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.kcpKubeConfig' -)
+
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
+
+      KCP_KUBECONFIG=$KCP_KUBECONFIG yq eval '.data."admin.kubeconfig" = env(KCP_KUBECONFIG)' samples/kcp-sgs-pipelines/resources/singapore-secret.yaml | oc apply -f -
 
       oc apply -f samples/kcp-sgs-pipelines/resources/argo-rbac.yaml
       oc apply -f samples/kcp-sgs-pipelines/resources/acm-argo.yaml
       oc apply -f samples/kcp-sgs-pipelines/resources/cluster-registration-argo.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/sinagpore-argo.yaml
 
       _ATTEMPTS=0
       until oc get mch multiclusterhub -n open-cluster-management -o jsonpath={'.status.phase'} | grep "Running";
