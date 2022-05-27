@@ -126,6 +126,8 @@ spec:
       #!/bin/bash
       set -e
 
+      KCP_KUBECONFIG=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.kcpKubeConfig' -)
+
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
@@ -133,6 +135,8 @@ spec:
 
       echo "Creating Namespace..."
       oc create namespace open-cluster-management --dry-run=client -o yaml | oc apply -f -
+
+      KCP_KUBECONFIG=$KCP_KUBECONFIG yq eval '.data."admin.kubeconfig" = env(KCP_KUBECONFIG)' samples/kcp-sgs-pipelines/resources/singapore-secret.yaml | oc apply -f -
       
       echo "Creating ImagePullSecret..."
       _TEMPLATE="apiVersion: v1
@@ -190,12 +194,8 @@ spec:
       #!/bin/bash
       set -e
 
-      KCP_KUBECONFIG=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.kcpKubeConfig' -)
-
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
-
-      KCP_KUBECONFIG=$KCP_KUBECONFIG yq eval '.data."admin.kubeconfig" = env(KCP_KUBECONFIG)' samples/kcp-sgs-pipelines/resources/singapore-secret.yaml | oc apply -f -
 
       oc apply -f samples/kcp-sgs-pipelines/resources/argo-rbac.yaml
       oc apply -f samples/kcp-sgs-pipelines/resources/acm-argo.yaml
@@ -493,6 +493,40 @@ spec:
       oc apply -f samples/kcp-sgs-pipelines/resources/alertmanager.yaml
 
       echo "Alertmanager is deployed"
+
+      exit 0 
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    name: apply
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-kcp-hub-apply-policies
+spec:
+  steps:
+  - args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _LOGIN_CMD=$(cat login.sh)
+      eval "$_LOGIN_CMD"
+
+      echo "Applying Policies"
+      echo "Encrypting ETCD via policy"
+
+      oc apply -f samples/kcp-sgs-pipelines/resources/policies/
+
+      echo "Policies applied"
 
       exit 0 
     command:
