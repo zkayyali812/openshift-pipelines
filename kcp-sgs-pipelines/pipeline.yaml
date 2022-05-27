@@ -98,5 +98,17 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
+  - name: apply-policies
+    runAfter:
+    - configure-idp
+    - configure-hypershift
+    - deploy-observability
+    - deploy-alertmanager
+    taskRef:
+      kind: Task
+      name: deploy-kcp-hub-apply-policies
+    workspaces:
+    - name: source
+      workspace: shared-workspace
   workspaces:
   - name: shared-workspace
