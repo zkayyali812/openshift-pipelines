@@ -11,7 +11,7 @@ objects:
   - apiVersion: batch/v1beta1
     kind: CronJob
     metadata:
-      name: autoscale-hypershift-cronjob
+      name: scale-down-cronjob
       namespace: ${NAMESPACE}
     spec:
       schedule: ${SCALE_DOWN_SCHEDULE}
