@@ -1,0 +1,47 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: deploy-osd-cluster-integration
+spec:
+  params:
+  - name: clusterName
+    type: string
+    description: The name of the OSD cluster to create
+    default: "sgs-integration"
+  tasks:
+  - name: create-osd-cluster
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-deploy-integration-osd-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: ensure-cluster-is-ready
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-ensure-integration-cluster-is-ready
+    runAfter:
+      - create-osd-cluster
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: add-idp-to-cluster
+    params:
+    - name: clusterName
+      value: "$(params.clusterName)"
+    taskRef:
+      kind: Task
+      name: singapore-gateway-ensure-integration-cluster-idp
+    runAfter:
+      - ensure-cluster-is-ready
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  workspaces:
+  - name: shared-workspace
