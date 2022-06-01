@@ -61,18 +61,18 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: configure-cluster-staging
-    params:
-    - name: clusterName
-      value: "$(params.clusterName)"
-    taskRef:
-      kind: Task
-      name: singapore-gateway-configure-prod-cluster
-    runAfter:
-      - add-idp-to-cluster
-      - fetch-repo-samples
-    workspaces:
-    - name: source
-      workspace: shared-workspace
+  # - name: configure-cluster-staging
+  #   params:
+  #   - name: clusterName
+  #     value: "$(params.clusterName)"
+  #   taskRef:
+  #     kind: Task
+  #     name: singapore-gateway-configure-prod-cluster
+  #   runAfter:
+  #     - add-idp-to-cluster
+  #     - fetch-repo-samples
+  #   workspaces:
+  #   - name: source
+  #     workspace: shared-workspace
   workspaces:
   - name: shared-workspace
