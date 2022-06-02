@@ -20,7 +20,7 @@ spec:
       serviceAccountName: kcp-ocm-integration-controller-sa
       containers:
       - name: kcp-ocm-integration-controller
-        image: quay.io/stolostron/singapore:2.5.0-0eef12ba27c3353b10df9d83fb2a90c406300783
+        image: quay.io/stolostron/singapore:2.6.0-0ded3cdac51d7846bb292e79367bd047608e6f1a
         args:
           - "/kcp-ocm"
           - "manager"
