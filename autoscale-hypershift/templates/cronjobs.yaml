@@ -59,11 +59,11 @@ objects:
 parameters:
   - name: SCALE_DOWN_SCHEDULE 
     description: Scaledown schedule in UTC (e.g. "0 23 * * 0-6" is everyday at 6pm EST)
-    value: 0 23 * * 0-6
+    value: 0 0 * * 6
     required: true 
   - name: SCALE_UP_SCHEDULE 
     description: Resume schedule in UTC (e.g. "0 13 * * 1-5" is weekdays at 8am EST)
-    value: 0 13 * * 1-5
+    value: 0 7 * * 1
     required: true
   - name: SCALE_DOWN_DISABLED
     description: Disable scaledown CronJob
