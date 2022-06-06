@@ -126,7 +126,8 @@ spec:
       #!/bin/bash
       set -e
 
-      KCP_KUBECONFIG=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.kcpKubeConfig' -)
+      KCP_KUBECONFIG_STABLE=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.kcpKubeConfigStable' -)
+      KCP_KUBECONFIG_UNSTABLE=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.kcpKubeConfigUnstable' -)
 
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
@@ -136,8 +137,13 @@ spec:
       echo "Creating Namespace..."
       oc create namespace open-cluster-management --dry-run=client -o yaml | oc apply -f -
 
-      KCP_KUBECONFIG=$KCP_KUBECONFIG yq eval '.data."admin.kubeconfig" = env(KCP_KUBECONFIG)' samples/kcp-sgs-pipelines/resources/singapore-secret.yaml | oc apply -f -
+      KCP_KUBECONFIG_STABLE=$KCP_KUBECONFIG_STABLE yq eval '.data."admin.kubeconfig" = env(KCP_KUBECONFIG_STABLE)' samples/kcp-sgs-pipelines/resources/singapore-secret.yaml | oc apply -n open-cluster-management -f -
       
+      oc create namespace singapore-unstable --dry-run=client -o yaml | oc apply -f -
+
+      KCP_KUBECONFIG_UNSTABLE=$KCP_KUBECONFIG_UNSTABLE yq eval '.data."admin.kubeconfig" = env(KCP_KUBECONFIG_UNSTABLE)' samples/kcp-sgs-pipelines/resources/singapore-secret.yaml | oc apply -n singapore-unstable -f -
+      
+
       echo "Creating ImagePullSecret..."
       _TEMPLATE="apiVersion: v1
       data:
