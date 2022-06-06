@@ -6,6 +6,32 @@ metadata:
 spec:
   hostingCluster: local-cluster
   hostingNamespace: local-cluster
+  hostedClusterSpec:
+    networking:
+      machineCIDR: 10.0.0.0/16
+      networkType: OpenShiftSDN
+      podCIDR: 10.132.0.0/14
+      serviceCIDR: 172.31.0.0/16
+    platform:
+      type: AWS
+    pullSecret:
+      name: kcp-unstable-pull-secret
+    release:
+      image: quay.io/openshift-release-dev/ocp-release:4.10.17-x86_64
+    services:
+    - service: APIServer
+      servicePublishingStrategy:
+        type: LoadBalancer
+    - service: OAuthServer
+      servicePublishingStrategy:
+        type: Route
+    - service: Konnectivity
+      servicePublishingStrategy:
+        type: Route
+    - service: Ignition
+      servicePublishingStrategy:
+        type: Route
+    sshKey: {}
   infrastructure:
     cloudProvider:
       name: aws-credentials
