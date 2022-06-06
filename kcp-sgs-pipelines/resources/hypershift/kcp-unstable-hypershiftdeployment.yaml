@@ -1,0 +1,15 @@
+apiVersion: cluster.open-cluster-management.io/v1alpha1
+kind: HypershiftDeployment
+metadata:
+  name: kcp-unstable
+  namespace: local-cluster
+spec:
+  hostingCluster: local-cluster
+  hostingNamespace: local-cluster
+  infrastructure:
+    cloudProvider:
+      name: aws-credentials
+    configure: True
+    platform:
+      aws:
+        region: us-east-1
