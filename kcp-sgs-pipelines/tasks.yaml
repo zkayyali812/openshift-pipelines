@@ -268,44 +268,40 @@ spec:
       #!/bin/bash
       set -e
 
+      function validateHD {
+        _HD_NAME=$1
+
+        echo "Validating ${_HD_NAME} Hypershiftdeployment has completed"
+        _ATTEMPTS=0
+        until  oc get hd ${_HD_NAME} -n local-cluster --no-headers | grep "Completed";
+        do 
+          echo "$_ATTEMPTS/60: ${_HD_NAME} Hypershiftdeployment is not yet ready"
+          _ATTEMPTS=$((_ATTEMPTS + 1))
+          sleep 60;
+          if [[ $_ATTEMPTS == 60 ]]; then
+              echo "The Hypershiftdeployment is not ready"
+              oc delete hd ${_HD_NAME} -n local-cluster
+              exit 1
+          fi
+        done
+        echo "${_HD_NAME} Hypershiftdeployment has completed successfully"
+      }
+
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
       echo "Applying Hypershiftdeployment ..."
       oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/aws-hypershiftdeployment.yaml -n local-cluster
       oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/azr-hypershiftdeployment.yaml -n local-cluster
+      oc apply -f samples/kcp-sgs-pipelines/resources/hypershift/kcp-unstable-hypershiftdeployment.yaml -n local-cluster
       echo "Hypershiftdeployments applied"
 
-      echo "Validating AWS Hypershiftdeployment has completed"
-      _ATTEMPTS=0
-      until  oc get hd aws-hd -n local-cluster --no-headers | grep "Completed";
-      do 
-        echo "$_ATTEMPTS/60: AWS Hypershiftdeployment is not yet ready"
-        _ATTEMPTS=$((_ATTEMPTS + 1))
-        sleep 60;
-        if [[ $_ATTEMPTS == 60 ]]; then
-            echo "The Hypershiftdeployment is not ready"
-            oc delete hd aws-hd -n local-cluster
-            exit 1
-        fi
-      done
-      echo "AWS Hypershiftdeployment has completed successfully"
+      validateHD aws-hd
+      validateHD azr-hd
+      validateHD kcp-unstable
 
-      echo "Validating Azure Hypershiftdeployment has completed"
-      _ATTEMPTS=0
-      until  oc get hd azure-hd -n local-cluster --no-headers | grep "Completed";
-      do 
-        echo "$_ATTEMPTS/60: Azure Hypershiftdeployment is not yet ready"
-        _ATTEMPTS=$((_ATTEMPTS + 1))
-        sleep 60;
-        if [[ $_ATTEMPTS == 60 ]]; then
-            echo "The Hypershiftdeployment is not ready"
-            oc delete hd azure-hd -n local-cluster
-            exit 1
-        fi
-      done
-      echo "Azure Hypershiftdeployment has completed successfully"
-
+      echo "Hypershiftdeployments are ready"
+      exit 0
     command:
     - /bin/bash
     - -c
