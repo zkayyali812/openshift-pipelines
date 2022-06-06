@@ -1,0 +1,41 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: kcp-ocm-integration-controller
+  namespace: singapore-unstable
+  labels:
+    app: kcp-ocm-integration-controller
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kcp-ocm-integration-controller
+  template:
+    metadata:
+      labels:
+        app: kcp-ocm-integration-controller
+    spec:
+      serviceAccountName: kcp-ocm-integration-controller-sa
+      containers:
+      - name: kcp-ocm-integration-controller
+        image: quay.io/stolostron/singapore:2.6.0-0fcaa0000d9953886a7ea1968c2ab65646eb2a39
+        args:
+          - "/kcp-ocm"
+          - "manager"
+          - "--disable-leader-election"
+          - "--kcp-kubeconfig=/var/kcp-ocm/kcp/admin.kubeconfig"
+          - "-v=4"
+        env:
+          - name: KCP_SYNCER_IMAGE
+            value: ghcr.io/kcp-dev/kcp/syncer:main
+          - name: KCP_INSTANCE
+            value: kcp-unstable
+        volumeMounts:
+        - name: kcp-admin-kubeconfig
+          mountPath: "/var/kcp-ocm/kcp"
+      volumes:
+      - name: kcp-admin-kubeconfig
+        secret:
+          secretName: kcp-admin-kubeconfig
