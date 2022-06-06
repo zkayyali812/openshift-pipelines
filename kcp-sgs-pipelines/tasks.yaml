@@ -297,7 +297,7 @@ spec:
       echo "Hypershiftdeployments applied"
 
       validateHD aws-hd
-      validateHD azr-hd
+      validateHD azure-hd
       validateHD kcp-unstable
 
       echo "Hypershiftdeployments are ready"
