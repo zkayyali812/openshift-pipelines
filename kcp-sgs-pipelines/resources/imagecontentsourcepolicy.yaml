@@ -1,8 +1,7 @@
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
-  annotations:
-  name: rhacm-repo
+  name: cluster
 spec:
   repositoryDigestMirrors:
   - mirrors:
