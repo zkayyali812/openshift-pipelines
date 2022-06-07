@@ -15,7 +15,7 @@ spec:
     platform:
       type: AWS
     pullSecret:
-      name: kcp-unstable-pull-secret
+      name: globalpullsecret
     release:
       image: quay.io/openshift-release-dev/ocp-release:4.10.17-x86_64
     services:
