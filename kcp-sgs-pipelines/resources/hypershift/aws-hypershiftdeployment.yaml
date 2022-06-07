@@ -7,6 +7,16 @@ spec:
   hostingCluster: local-cluster
   hostingNamespace: local-cluster
   hostedClusterSpec:
+    imageContentSources:
+    - source: registry.redhat.io/rhacm2
+      mirrors:
+      - quay.io:443/acm-d
+    - source: registry.redhat.io/multicluster-engine
+      mirrors:
+      - quay.io:443/acm-d
+    - source: registry.access.redhat.com/openshift4/ose-oauth-proxy
+      mirrors:
+      - registry.redhat.io/openshift4/ose-oauth-proxy
     networking:
       machineCIDR: 10.0.0.0/16
       networkType: OpenShiftSDN
@@ -15,7 +25,7 @@ spec:
     platform:
       type: AWS
     pullSecret:
-      name: aws-hd-pull-secret
+      name: globalpullsecret
     release:
       image: quay.io/openshift-release-dev/ocp-release:4.10.17-x86_64
     services:
