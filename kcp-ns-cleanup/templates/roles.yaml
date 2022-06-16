@@ -1,0 +1,38 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: kcp-ns-cleanup-roles
+objects:
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: kcp-ns-cleanup
+    rules:
+    - apiGroups: ["cluster.open-cluster-management.io"]
+      resources: ["hypershiftdeployments"]
+      verbs: ["get", "list"]
+    - apiGroups: [""]
+      resources: ["secrets"]
+      verbs: ["get"]
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+        name: kcp-ns-cleanup
+        namespace: ${NAMESPACE}
+    subjects:
+    - kind: ServiceAccount
+      name: kcp-ns-cleanup
+      namespace: ${NAMESPACE}
+    roleRef:
+      kind: ClusterRole
+      name: kcp-ns-cleanup
+      apiGroup: rbac.authorization.k8s.io
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: kcp-ns-cleanup
+      namespace: ${NAMESPACE}
+parameters:
+  - name: NAMESPACE 
+    description: The namespace where the scaledown CronJobs were installed
+    required: true
