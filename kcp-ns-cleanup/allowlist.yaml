@@ -1,0 +1,14 @@
+resources:
+  configmaps:
+  - kcp-root-ca.crt
+  - kube-root-ca.crt
+  - openshift-service-ca.crt
+  serviceaccounts:
+  - builder
+  - default
+  - deployer
+  secrets:
+  - builder-
+  - default-
+  - deployer-
+  - kubernetes

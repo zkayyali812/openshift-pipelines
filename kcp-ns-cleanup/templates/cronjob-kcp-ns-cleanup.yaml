@@ -1,0 +1,35 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: kcp-ns-cleanup-cronjob
+objects:
+  - apiVersion: batch/v1beta1
+    kind: CronJob
+    metadata:
+      name: kcp-ns-cleanup-cronjob-${RANDOM_ID}
+      namespace: ${NAMESPACE}
+    spec:
+      schedule: ${SCHEDULE}
+      suspend: false
+      jobTemplate:
+        spec:
+          template:
+            spec: 
+              serviceAccountName:  kcp-ns-cleanup
+              containers:
+              - name: worker
+                image: quay.io/acm-sre/kcp-ns-cleanup:2.5.0
+                imagePullPolicy: Always
+                command: ['./kcp-ns-cleanup']
+              restartPolicy: OnFailure
+parameters:
+  - name: SCHEDULE 
+    description: ScaleDown or ScaleUp schedule in UTC (e.g. "0 23 * * 0-6" is everyday at 6pm EST)
+    value: 0 23 * * 0-6
+    required: true 
+  - name: NAMESPACE 
+    description: The namespace where the scaledown CronJobs were installed
+    required: true
+  - name: RANDOM_ID
+    generate: expression
+    from: "[a-z0-9]{5}"

@@ -1,0 +1,28 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: autoscale-hypershift
+objects:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: kcp-ns-cleanup-job-${RANDOM_ID}
+      namespace: ${NAMESPACE}
+    spec:
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: kcp-ns-cleanup
+          containers:
+          - name: worker
+            image: quay.io/acm-sre/kcp-ns-cleanup:2.5.0
+            imagePullPolicy: Always
+            command: ['./kcp-ns-cleanup']
+          restartPolicy: OnFailure
+parameters:
+  - name: RANDOM_ID
+    generate: expression
+    from: "[a-z0-9]{5}"
+  - name: NAMESPACE 
+    description: The namespace where the kcp-ns-cleanup CronJobs were installed
+    required: true
