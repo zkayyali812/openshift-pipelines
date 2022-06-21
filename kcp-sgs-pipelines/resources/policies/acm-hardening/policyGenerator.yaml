@@ -72,4 +72,4 @@ policySets:
     description: Apply standard best practices for hardening your Red Hat Advanced
       Cluster Management for Kubernetes installation.
     placement:
-      placementPath: input/placement.yaml
+      placementRulePath: input/placement.yaml
