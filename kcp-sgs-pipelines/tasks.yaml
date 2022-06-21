@@ -432,18 +432,8 @@ spec:
     name: apply
     resources: {}
     workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: deploy-kcp-hub-deploy-alertmanager-to-github
-spec:
-  steps:
-  - args:
+  - name: alertmanager-to-github
+    args:
     - |-
       #!/bin/bash
       set -e
@@ -460,25 +450,15 @@ spec:
       echo "Alertmanager to Github is deployed"
 
       exit 0
+
     command:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
-  workspaces:
-  - name: source
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: deploy-kcp-hub-deploy-alertmanager
-spec:
-  steps:
-  - args:
+  - name: alertmanager
+    args:
     - |-
       #!/bin/bash
       set -e
@@ -496,17 +476,16 @@ spec:
 
       echo "Alertmanager is deployed"
 
-      exit 0 
+      exit 0
+
     command:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
     resources: {}
     workingDir: /workspace/source
   workspaces:
   - name: source
-
 ---
 
 apiVersion: tekton.dev/v1beta1
@@ -523,10 +502,12 @@ spec:
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      echo "Applying Policies"
-      echo "Encrypting ETCD via policy"
+      echo "Applying ACM hardening policies"
 
-      oc apply -f samples/kcp-sgs-pipelines/resources/policies/
+      # oc apply -f samples/kcp-sgs-pipelines/resources/policies/
+
+      cd samples/kcp-sgs-pipelines/resources/policies/acm-hardening
+      kustomize build --enable-alpha-plugins
 
       echo "Policies applied"
 
