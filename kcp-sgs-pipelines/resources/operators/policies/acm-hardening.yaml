@@ -1,0 +1,253 @@
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  labels:
+    open-cluster-management.io/policy-set: acm-hardening
+  name: placement-acm-hardening
+  namespace: policies
+spec:
+  clusterConditions:
+  - status: "True"
+    type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchExpressions:
+    - key: local-cluster
+      operator: In
+      values:
+      - "true"
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  labels:
+    open-cluster-management.io/policy-set: acm-hardening
+  name: binding-policy-acm-hardening
+  namespace: policies
+placementRef:
+  apiGroup: apps.open-cluster-management.io
+  kind: PlacementRule
+  name: placement-acm-hardening
+subjects:
+- apiGroup: policy.open-cluster-management.io
+  kind: PolicySet
+  name: acm-hardening
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    open-cluster-management.io/policy-set: acm-hardening
+  name: policy-check-backups
+  namespace: policies
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-check-backups
+      spec:
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: cluster.open-cluster-management.io
+            kind: BackupSchedule
+            status:
+              phase: Enabled
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app: cluster-backup-chart
+              namespace: open-cluster-management-backup
+            status:
+              phase: Running
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              annotations:
+                repository: https://github.com/openshift/oadp-operator
+              namespace: open-cluster-management-backup
+            status:
+              phase: Running
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              labels:
+                app.kubernetes.io/name: velero
+              namespace: open-cluster-management-backup
+            status:
+              phase: Running
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: velero.io/v1
+            kind: BackupStorageLocation
+            metadata:
+              namespace: open-cluster-management-backup
+            status:
+              phase: Available
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: velero.io/v1
+            kind: Backup
+            metadata:
+              labels:
+                velero.io/schedule-name: acm-validation-policy-schedule
+              namespace: open-cluster-management-backup
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: velero.io/v1
+            kind: Backup
+            metadata:
+              labels:
+                velero.io/schedule-name: acm-managed-clusters-schedule
+              namespace: open-cluster-management-backup
+            status:
+              phase: Completed
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: velero.io/v1
+            kind: Backup
+            metadata:
+              labels:
+                velero.io/schedule-name: acm-resources-schedule
+              namespace: open-cluster-management-backup
+            status:
+              phase: Completed
+        remediationAction: inform
+        severity: medium
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CA Security Assessment and Authorization
+    policy.open-cluster-management.io/controls: CA-2 Security Assessments
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    open-cluster-management.io/policy-set: acm-hardening
+  name: policy-check-policyreports
+  namespace: policies
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-check-policyreports
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift*
+          include:
+          - '*'
+        object-templates:
+        - complianceType: mustnothave
+          objectDefinition:
+            apiVersion: wgpolicyk8s.io/v1alpha2
+            kind: PolicyReport
+            results:
+            - result: fail
+        remediationAction: inform
+        severity: medium
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CA Security Assessment and Authorization
+    policy.open-cluster-management.io/controls: CA-7 Continuous Monitoring
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    open-cluster-management.io/policy-set: acm-hardening
+  name: policy-managedclusteraddon-available
+  namespace: policies
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-managedclusteraddon-available
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift*
+          include:
+          - '*'
+        object-templates:
+        - complianceType: mustnothave
+          objectDefinition:
+            apiVersion: addon.open-cluster-management.io/v1alpha1
+            kind: ManagedClusterAddOn
+            status:
+              conditions:
+              - status: "False"
+                type: Available
+        remediationAction: inform
+        severity: medium
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SI System and Information Integrity
+    policy.open-cluster-management.io/controls: SI-5 Security Alerts Advisories and
+      Directives
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    open-cluster-management.io/policy-set: acm-hardening
+  name: policy-subscriptions
+  namespace: policies
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-subscriptions
+      spec:
+        namespaceSelector:
+          exclude:
+          - openshift*
+          include:
+          - '*'
+        object-templates:
+        - complianceType: mustnothave
+          objectDefinition:
+            apiVersion: apps.open-cluster-management.io/v1
+            kind: Subscription
+            status:
+              phase: Failed
+        remediationAction: inform
+        severity: medium
+---
+apiVersion: policy.open-cluster-management.io/v1beta1
+kind: PolicySet
+metadata:
+  labels:
+    open-cluster-management.io/policy-set: acm-hardening
+  name: acm-hardening
+  namespace: policies
+spec:
+  description: Apply standard best practices for hardening your Red Hat Advanced Cluster
+    Management for Kubernetes installation.
+  policies:
+  - policy-check-backups
+  - policy-check-policyreports
+  - policy-managedclusteraddon-available
+  - policy-subscriptions
