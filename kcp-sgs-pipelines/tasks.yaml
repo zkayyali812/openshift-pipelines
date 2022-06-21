@@ -203,10 +203,10 @@ spec:
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      oc apply -f samples/kcp-sgs-pipelines/resources/argo-rbac.yaml
-      oc apply -f samples/kcp-sgs-pipelines/resources/acm-argo.yaml
-      oc apply -f samples/kcp-sgs-pipelines/resources/cluster-registration-argo.yaml
-      oc apply -f samples/kcp-sgs-pipelines/resources/sinagpore-argo.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/argo/argo-rbac.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/argo/acm-argo.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/argo/cluster-registration-argo.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/argo/sinagpore-argo.yaml
 
       _ATTEMPTS=0
       until oc get mch multiclusterhub -n open-cluster-management -o jsonpath={'.status.phase'} | grep "Running";
@@ -502,19 +502,9 @@ spec:
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
 
-      echo "Applying ACM hardening policies"
-
-      # oc apply -f samples/kcp-sgs-pipelines/resources/policies/
-
-      curl -sLO https://github.com/stolostron/policy-generator-plugin/releases/download/v1.7.0/linux-amd64-PolicyGenerator -o linux-amd64-PolicyGenerator
-
-      mkdir -p ${HOME}/.config/kustomize/plugin/policy.open-cluster-management.io/v1/policygenerator
-
-      chmod +x linux-amd64-PolicyGenerator
-      mv linux-amd64-PolicyGenerator ${HOME}/.config/kustomize/plugin/policy.open-cluster-management.io/v1/policygenerator/PolicyGenerator
+      echo "Applying policies"
       oc create namespace policies --dry-run=client -o yaml | oc apply -f -
-
-      oc kustomize --enable-alpha-plugins=true samples/kcp-sgs-pipelines/resources/policies/acm-hardening | oc apply -f -
+      oc apply -f samples/kcp-sgs-pipelines/resources/argo/policies.yaml
 
       echo "Policies applied"
 
