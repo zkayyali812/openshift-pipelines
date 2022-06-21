@@ -28,7 +28,7 @@ var hypershiftDeploymentRes = schema.GroupVersionResource{Group: "cluster.open-c
 var secretRes = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
 var namespaceRes = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 var customResourceDefinitionRes = schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
-var namespacedCoreV1GVKs = []schema.GroupVersionResource{
+var resourcesToCheck = []schema.GroupVersionResource{
 	// {Group: "", Version: "v1", Resource: "bindings"},
 	{Group: "", Version: "v1", Resource: "configmaps"},
 	{Group: "", Version: "v1", Resource: "endpoints"},
@@ -42,6 +42,11 @@ var namespacedCoreV1GVKs = []schema.GroupVersionResource{
 	{Group: "", Version: "v1", Resource: "secrets"},
 	{Group: "", Version: "v1", Resource: "serviceaccounts"},
 	{Group: "", Version: "v1", Resource: "services"},
+	{Group: "apps", Version: "v1", Resource: "controllerrevisions"},
+	{Group: "apps", Version: "v1", Resource: "daemonsets"},
+	{Group: "apps", Version: "v1", Resource: "deployments"},
+	{Group: "apps", Version: "v1", Resource: "replicasets"},
+	{Group: "apps", Version: "v1", Resource: "statefulsets"},
 }
 
 // Simple error function
@@ -127,14 +132,14 @@ func cleanupKCPNamespaces(hd *hyperdeployv1alpha1.HypershiftDeployment, kubeconf
 
 func checkIfResourcesExistInHostedCluster(client dynamic.Interface, namespace string, unstructuredCRDs []unstructured.Unstructured) {
 	resourcesFound := false
-	fmt.Printf("-> Checking for corev1 resources in namespace: %s\n", namespace)
-	for _, coreV1GVR := range namespacedCoreV1GVKs {
-		unstructuredResources, err := client.Resource(coreV1GVR).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
+	fmt.Printf("-> Checking for core resources in namespace: %s\n", namespace)
+	for _, resourceToCheck := range resourcesToCheck {
+		unstructuredResources, err := client.Resource(resourceToCheck).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
 		checkError(err)
 		if len(unstructuredResources.Items) > 0 {
-			remainingResources := filterOutAllowedResources(unstructuredResources.Items, coreV1GVR.Resource)
+			remainingResources := filterOutAllowedResources(unstructuredResources.Items, resourceToCheck.Resource)
 			if len(remainingResources) > 0 {
-				fmt.Printf("--> Found %d %s\n", len(remainingResources), coreV1GVR.Resource)
+				fmt.Printf("--> Found %d %s\n", len(remainingResources), resourceToCheck.Resource)
 				for _, resourceName := range remainingResources {
 					fmt.Println("---> - ", resourceName.GetName())
 				}
