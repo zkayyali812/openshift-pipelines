@@ -1,7 +1,7 @@
 kind: Template
 apiVersion: template.openshift.io/v1
 metadata:
-  name: autoscale-hypershift
+  name: kcp-ns-cleanup-job
 objects:
   - apiVersion: batch/v1
     kind: Job

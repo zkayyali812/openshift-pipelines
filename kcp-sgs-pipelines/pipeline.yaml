@@ -80,30 +80,11 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: deploy-alertmanager-to-github
-    runAfter:
-    - ensure-acm
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-deploy-alertmanager-to-github
-    workspaces:
-    - name: source
-      workspace: shared-workspace
-  - name: deploy-alertmanager
-    runAfter:
-    - deploy-alertmanager-to-github
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-deploy-alertmanager
-    workspaces:
-    - name: source
-      workspace: shared-workspace
   - name: apply-policies
     runAfter:
     - configure-idp
     - configure-hypershift
     - deploy-observability
-    - deploy-alertmanager
     taskRef:
       kind: Task
       name: deploy-kcp-hub-apply-policies
