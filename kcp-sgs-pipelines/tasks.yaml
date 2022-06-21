@@ -506,8 +506,15 @@ spec:
 
       # oc apply -f samples/kcp-sgs-pipelines/resources/policies/
 
-      cd samples/kcp-sgs-pipelines/resources/policies/acm-hardening
-      kustomize build --enable-alpha-plugins
+      curl -sLO https://github.com/stolostron/policy-generator-plugin/releases/download/v1.7.0/linux-amd64-PolicyGenerator -o linux-amd64-PolicyGenerator
+
+      mkdir -p ${HOME}/.config/kustomize/plugin/policy.open-cluster-management.io/v1/policygenerator
+
+      chmod +x linux-amd64-PolicyGenerator
+      mv linux-amd64-PolicyGenerator ${HOME}/.config/kustomize/plugin/policy.open-cluster-management.io/v1/policygenerator/PolicyGenerator
+      oc create namespace policies --dry-run=client -o yaml | oc apply -f -
+
+      oc kustomize --enable-alpha-plugins=true samples/kcp-sgs-pipelines/resources/policies/acm-hardening | oc apply -f -
 
       echo "Policies applied"
 
