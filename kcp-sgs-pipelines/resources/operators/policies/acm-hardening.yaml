@@ -57,6 +57,8 @@ spec:
           objectDefinition:
             apiVersion: cluster.open-cluster-management.io/v1beta1
             kind: BackupSchedule
+            metadata:
+              namespace: open-cluster-management-backup
             status:
               phase: Enabled
         - complianceType: musthave
