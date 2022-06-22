@@ -429,7 +429,7 @@ spec:
     - /bin/bash
     - -c
     image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
+    name: observability
     resources: {}
     workingDir: /workspace/source
   - name: alertmanager-to-github
@@ -491,7 +491,7 @@ spec:
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: deploy-kcp-hub-apply-policies
+  name: deploy-kcp-hub-apply-argo
 spec:
   steps:
   - args:
@@ -499,14 +499,25 @@ spec:
       #!/bin/bash
       set -e
 
+      _AWS_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsAccessKey' - | base64 -d)
+      _AWS_SECRET_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsSecretAccessKey' - | base64 -d)
+
+      echo "[default]
+      aws_access_key_id=${_AWS_ACCESS_KEY}
+      aws_secret_access_key=${_AWS_SECRET_ACCESS_KEY}" > awscredentials
+
       _LOGIN_CMD=$(cat login.sh)
       eval "$_LOGIN_CMD"
+
+      oc create secret generic cloud-credentials --namespace openshift-adp --from-file cloud=awscredentials
 
       echo "Applying policies"
       oc create namespace policies --dry-run=client -o yaml | oc apply -f -
       oc apply -f samples/kcp-sgs-pipelines/resources/argo/policies.yaml
+      oc apply -f samples/kcp-sgs-pipelines/resources/argo/cluster-backup.yaml
 
-      echo "Policies applied"
+
+      echo "Argo apps applied"
 
       exit 0 
     command:

@@ -41,6 +41,6 @@ spec:
       name: multicluster-engine
     - enabled: false
       name: cluster-proxy-addon
-    - enabled: false
+    - enabled: true
       name: cluster-backup
   separateCertificateManagement: false
