@@ -12,19 +12,18 @@ spec:
     restic:
       enable: true
   backupLocations:
-    - name: default
-      velero:
-        provider: aws
-        default: true
-        objectStorage:
-          bucket: kcp-sgs-backup-and-restore
-          prefix: velero
-        config:
-          region: us-east-1
-          profile: "default"
-        credential:
-          name: cloud-credentials
-          key: cloud
+  - velero:
+      provider: aws
+      default: true
+      objectStorage:
+        bucket: kcp-sgs-backup-and-restore
+        prefix: velero
+      config:
+        region: us-east-1
+        profile: "default"
+      credential:
+        name: cloud-credentials
+        key: cloud
   snapshotLocations:
   - velero:
       provider: aws
