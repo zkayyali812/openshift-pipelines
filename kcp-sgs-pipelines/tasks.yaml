@@ -483,7 +483,7 @@ spec:
       eval "$_LOGIN_CMD"
 
       oc create namespace open-cluster-management-backup --dry-run=client -o yaml | oc apply -f -
-      oc create secret generic cloud-credentials --namespace open-cluster-management-backup --from-file cloud=awscredentials
+      oc create secret generic cloud-credentials --namespace open-cluster-management-backup --from-file cloud=awscredentials || true
 
       echo "Applying policies"
       oc create namespace policies --dry-run=client -o yaml | oc apply -f -
