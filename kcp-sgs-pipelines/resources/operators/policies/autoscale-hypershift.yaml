@@ -1,0 +1,136 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-autoscale-hypershift
+  namespace: policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: enable-autoscale-hypershift
+        spec:
+          remediationAction: enforce
+          severity: low
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: batch/v1
+                kind: CronJob
+                metadata:
+                  name: autoscale-down-hypershift-cronjob
+                  namespace: policies
+                spec:
+                  schedule: 0 0 * * 6
+                  suspend: false
+                  jobTemplate:
+                    spec:
+                      template:
+                        spec: 
+                          serviceAccountName: autoscale-hypershift
+                          containers:
+                          - name: worker
+                            image: quay.io/acm-sre/autoscale-hypershift:2.5.0
+                            imagePullPolicy: Always
+                            command: ['./action']
+                            env:
+                            - name: TAKE_ACTION
+                              value: ScaleDown
+                            - name: OPT_IN
+                              value: "false"
+                          restartPolicy: OnFailure
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: batch/v1beta1
+                kind: CronJob
+                metadata:
+                  name: autoscale-up-cronjob
+                  namespace: policies
+                spec:
+                  schedule: 0 1 * * 1
+                  suspend: false
+                  jobTemplate:
+                    spec:
+                      template:
+                        spec:
+                          serviceAccountName: autoscale-hypershift
+                          containers:
+                          - name: worker
+                            image: quay.io/acm-sre/autoscale-hypershift:2.5.0
+                            imagePullPolicy: Always
+                            command: ['./action']
+                            env:
+                            - name: TAKE_ACTION
+                              value: ScaleUp
+                            - name: OPT_IN
+                              value: "false"
+                          restartPolicy: OnFailure
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRole
+                metadata:
+                  name: kcp-ns-cleanup
+                rules:
+                - apiGroups: ["cluster.open-cluster-management.io"]
+                  resources: ["hypershiftdeployments"]
+                  verbs: ["get", "list"]
+                - apiGroups: [""]
+                  resources: ["secrets"]
+                  verbs: ["get"]
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRoleBinding
+                metadata:
+                    name: kcp-ns-cleanup
+                    namespace: policies
+                subjects:
+                - kind: ServiceAccount
+                  name: kcp-ns-cleanup
+                  namespace: policies
+                roleRef:
+                  kind: ClusterRole
+                  name: kcp-ns-cleanup
+                  apiGroup: rbac.authorization.k8s.io
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: kcp-ns-cleanup
+                  namespace: policies
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-policy-autoscale-hypershift
+  namespace: policies
+placementRef:
+  name: placement-policy-autoscalehypershift
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
+subjects:
+- name: policy-autoscale-hypershift
+  kind: Policy
+  apiGroup: policy.open-cluster-management.io
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: placement-policy-autoscalehypershift
+  namespace: policies
+spec:
+  clusterConditions:
+  - status: "True"
+    type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchExpressions:
+      - {key: "local-cluster", operator: In, values: ["true"]}
