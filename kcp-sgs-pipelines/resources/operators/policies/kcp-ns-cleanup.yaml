@@ -1,0 +1,105 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-kcp-empty-ns-cleanup
+  namespace: policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: enable-kcp-empty-ns-cleanup
+        spec:
+          remediationAction: enforce
+          severity: low
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: batch/v1beta1
+                kind: CronJob
+                metadata:
+                  name: kcp-ns-cleanup-cronjob
+                  namespace: policies
+                spec:
+                  schedule: 0 23 * * 0-6
+                  suspend: false
+                  jobTemplate:
+                    spec:
+                      template:
+                        spec: 
+                          serviceAccountName:  kcp-ns-cleanup
+                          containers:
+                          - name: worker
+                            image: quay.io/acm-sre/kcp-ns-cleanup:2.5.0
+                            imagePullPolicy: Always
+                            command: ['./kcp-ns-cleanup']
+                          restartPolicy: OnFailure
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRole
+                metadata:
+                  name: kcp-ns-cleanup
+                rules:
+                - apiGroups: ["cluster.open-cluster-management.io"]
+                  resources: ["hypershiftdeployments"]
+                  verbs: ["get", "list"]
+                - apiGroups: [""]
+                  resources: ["secrets"]
+                  verbs: ["get"]
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRoleBinding
+                metadata:
+                    name: kcp-ns-cleanup
+                    namespace: policies
+                subjects:
+                - kind: ServiceAccount
+                  name: kcp-ns-cleanup
+                  namespace: policies
+                roleRef:
+                  kind: ClusterRole
+                  name: kcp-ns-cleanup
+                  apiGroup: rbac.authorization.k8s.io
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: kcp-ns-cleanup
+                  namespace: policies
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-kcp-empty-ns-cleanup
+  namespace: policies
+placementRef:
+  name: placement-kcp-empty-ns-cleanup
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
+subjects:
+- name: policy-kcp-empty-ns-cleanup
+  kind: Policy
+  apiGroup: policy.open-cluster-management.io
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: placement-kcp-empty-ns-cleanup
+  namespace: policies
+spec:
+  clusterConditions:
+  - status: "True"
+    type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchExpressions:
+      - {key: "local-cluster", operator: In, values: ["true"]}

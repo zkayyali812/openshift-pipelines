@@ -314,33 +314,6 @@ spec:
     image: quay.io/acm-sre/ocm-utils:latest
     resources: {}
     workingDir: /workspace/source
-  - name: apply-autoscaler
-    args:
-    - |-
-      #!/bin/bash
-      set -e
-
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
-
-      cd samples/autoscale-hypershift/
-
-      oc create namespace autoscale-hypershift --dry-run=client -o yaml | oc apply -f -
-
-      cat > options.env << EOF
-      NAMESPACE: autoscale-hypershift
-      EOF
-
-      make roles
-      make scale-up
-      make cronjobs
-
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    resources: {}
-    workingDir: /workspace/source
   workspaces:
   - name: source
 
