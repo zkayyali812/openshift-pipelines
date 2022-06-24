@@ -15,13 +15,27 @@ bundles:
   version: 2.5.0
   addonChannel: "beta"
   operator: "advanced-cluster-management"
+- image: "quay.io/acm-d/acm-operator-bundle:v2.5.1-11"
+  version: 2.5.1
+  addonChannel: "beta"
+  operator: "advanced-cluster-management"
 - image: "quay.io/acm-d/mce-operator-bundle:v2.0.0-150"
   version: 2.0.0
   addonChannel: "beta"
   operator: "multicluster-engine"
   parent: "advanced-cluster-management"
+- image: "quay.io/acm-d/mce-operator-bundle:v2.0.1-16"
+  version: 2.0.1
+  addonChannel: "beta"
+  operator: "multicluster-engine"
+  parent: "advanced-cluster-management"
 - image: "quay.io/acm-d/klusterlet-operator-bundle:v2.0.0-110"
   version: 2.0.0
+  addonChannel: "beta"
+  operator: "klusterlet-operator"
+  csvNameOverride: "klusterlet-product"
+- image: "quay.io/acm-d/klusterlet-operator-bundle:v2.0.1-10"
+  version: 2.0.1
   addonChannel: "beta"
   operator: "klusterlet-operator"
   csvNameOverride: "klusterlet-product"

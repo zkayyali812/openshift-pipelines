@@ -175,6 +175,8 @@ func checkIfResourcesExistInHostedCluster(client dynamic.Interface, namespace st
 
 	if !resourcesFound {
 		fmt.Printf("-> DELETING NAMESPACE %s<-\n", namespace)
+		err := client.Resource(namespaceRes).Delete(context.Background(), namespace, metav1.DeleteOptions{})
+		checkError(err)
 	}
 
 }
