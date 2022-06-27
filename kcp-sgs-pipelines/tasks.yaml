@@ -467,39 +467,88 @@ metadata:
   name: deploy-kcp-hub-apply-argo
 spec:
   steps:
-  - args:
-    - |-
-      #!/bin/bash
-      set -e
+    - args:
+        - |-
+          #!/bin/bash
+          set -e
 
-      _AWS_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsAccessKey' - | base64 -d)
-      _AWS_SECRET_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsSecretAccessKey' - | base64 -d)
+          _AWS_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsAccessKey' - | base64 -d)
+          _AWS_SECRET_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsSecretAccessKey' - | base64 -d)
+          _ZEROSSL_EAB_KID=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.zeroSSL_EAB_KID' - | base64 -d)
+          _ZEROSSL_EAB_HMAC_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.zeroSSL_EAB_HMAC_Key' - | base64 -d)
+          _CONGIG_SECRET=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval 'del(.metadata)' - | yq eval '.metadata.name = "kcp-sgs-pipelines-secrets-config"' -)
 
-      echo "[default]
-      aws_access_key_id=${_AWS_ACCESS_KEY}
-      aws_secret_access_key=${_AWS_SECRET_ACCESS_KEY}" > awscredentials
+          echo "[default]
+          aws_access_key_id=${_AWS_ACCESS_KEY}
+          aws_secret_access_key=${_AWS_SECRET_ACCESS_KEY}" > awscredentials
 
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
+          _LOGIN_CMD=$(cat login.sh)
+          eval "$_LOGIN_CMD"
 
-      oc create namespace open-cluster-management-backup --dry-run=client -o yaml | oc apply -f -
-      oc create secret generic cloud-credentials --namespace open-cluster-management-backup --from-file cloud=awscredentials || true
+          echo "Applying Policy prereqs"
+          oc create namespace policies --dry-run=client -o yaml | oc apply -f -
 
-      echo "Applying policies"
-      oc create namespace policies --dry-run=client -o yaml | oc apply -f -
-      oc apply -f samples/kcp-sgs-pipelines/resources/argo/policies.yaml
-      oc apply -f samples/kcp-sgs-pipelines/resources/argo/cluster-backup.yaml
+          echo "Applying Cluster Backup prereqs"
+          oc create namespace open-cluster-management-backup --dry-run=client -o yaml | oc apply -f -
+          oc create secret generic cloud-credentials --namespace open-cluster-management-backup --from-file cloud=awscredentials || true
 
+          echo "Applying CertManager prereqs"
+          git clone https://github.com/acmesh-official/acme.sh.git || true
+          cd acme.sh
 
-      echo "Argo apps applied"
+          export API=$(oc whoami --show-server | cut -f 2 -d ':' | cut -f 3 -d '/' | sed 's/-api././')
 
-      exit 0 
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    name: apply
-    resources: {}
-    workingDir: /workspace/source
+          export WILDCARD=$(oc get ingresscontroller default -n openshift-ingress-operator -o jsonpath='{.status.domain}')
+
+          echo "API: ${API}"
+          echo "WILDCARD: ${WILDCARD}"
+
+          ./acme.sh  --register-account  --server zerossl --eab-kid ${_ZEROSSL_EAB_KID} --eab-hmac-key  ${_ZEROSSL_EAB_HMAC_KEY}
+
+          AWS_SECRET_ACCESS_KEY=${_AWS_SECRET_ACCESS_KEY} AWS_ACCESS_KEY_ID=${_AWS_ACCESS_KEY} ./acme.sh  --issue --dns dns_aws -d ${API} -d *.${WILDCARD}
+
+          oc create secret tls router-certs --cert=/root/.acme.sh/${API}/fullchain.cer --key=/root/.acme.sh/${API}/${API}.key -n openshift-ingress || true
+          oc patch ingresscontroller default -n openshift-ingress-operator --type=merge --patch='{"spec": { "defaultCertificate": { "name": "router-certs" }}}'
+
+          oc create secret tls api-certs --cert=/root/.acme.sh/${API}/fullchain.cer --key=/root/.acme.sh/${API}/${API}.key -n openshift-config || true
+          oc patch apiserver cluster --type=merge -p \
+          "{\"spec\":{\"servingCerts\": {\"namedCertificates\": [{\"names\":
+          [\"${API}\"], \"serv.ingCertificate\": {\"name\": \"api-certs\"}}]}}}"
+
+          oc create namespace cert-manager --dry-run=client -o yaml | oc apply -f -
+
+          echo "$_CONGIG_SECRET" | oc apply -f - -n cert-manager
+          echo "All prereqs applied"
+
+          exit 0 
+      command:
+        - /bin/bash
+        - '-c'
+      image: 'quay.io/acm-sre/ocm-utils:latest'
+      name: apply-argo-prereqs
+      resources: {}
+      workingDir: /workspace/source
+    - args:
+        - |-
+          #!/bin/bash
+          set -e
+
+          _LOGIN_CMD=$(cat login.sh)
+          eval "$_LOGIN_CMD"
+
+          oc apply -f samples/kcp-sgs-pipelines/resources/argo/policies.yaml
+          oc apply -f samples/kcp-sgs-pipelines/resources/argo/cluster-backup.yaml
+          oc apply -f samples/kcp-sgs-pipelines/resources/argo/patch-operator.yaml
+          oc apply -f samples/kcp-sgs-pipelines/resources/argo/cert-manager.yaml
+
+          echo "Argo apps applied"
+          exit 0
+      command:
+        - /bin/bash
+        - '-c'
+      image: 'quay.io/acm-sre/ocm-utils:latest'
+      name: apply-argo-apps
+      resources: {}
+      workingDir: /workspace/source
   workspaces:
   - name: source
