@@ -33,6 +33,8 @@ spec:
                 spec:
                   acme:
                     email: acm-cicd@redhat.com
+                    privateKeySecretRef:
+                      name: letsencrypt-account-key
                     server: https://acme-v02.api.letsencrypt.org/directory
                     solvers:
                     - dns01:
