@@ -7,7 +7,7 @@ spec:
   description: "Grouping policies related to certificate handling"
   policies:
     - aws-clusterissuer-policy
-    # - cert-manager-csv-policy
+    - cert-manager-csv-policy
     - certification-expiration-policy
 ---
 apiVersion: policy.open-cluster-management.io/v1
