@@ -42,6 +42,7 @@ spec:
                         route53:
                           region: us-east-1
                           accessKeyID: '{{fromSecret "cert-manager" "kcp-sgs-pipelines-secrets-config" "awsAccessKey" | base64dec}}'
+                          hostedZoneID: '{{ (lookup "config.openshift.io/v1" "DNS" "" "cluster").spec.publicZone.id }}'
                           secretAccessKeySecretRef:
                             name: kcp-sgs-pipelines-secrets-config
                             key: awsSecretAccessKey
