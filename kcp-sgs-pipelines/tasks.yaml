@@ -513,7 +513,7 @@ spec:
           oc create secret tls api-certs --cert=/root/.acme.sh/${API}/fullchain.cer --key=/root/.acme.sh/${API}/${API}.key -n openshift-config || true
           oc patch apiserver cluster --type=merge -p \
           "{\"spec\":{\"servingCerts\": {\"namedCertificates\": [{\"names\":
-          [\"${API}\"], \"serv.ingCertificate\": {\"name\": \"api-certs\"}}]}}}"
+          [\"${API}\"], \"servingCertificate\": {\"name\": \"api-certs\"}}]}}}"
 
           oc create namespace cert-manager --dry-run=client -o yaml | oc apply -f -
 
