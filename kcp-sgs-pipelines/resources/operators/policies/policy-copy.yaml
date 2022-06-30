@@ -1,0 +1,504 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: open-cluster-management.policy-etcdencryption
+  name: open-cluster-management.policy-etcdencryption
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: enable-etcd-encryption
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: config.openshift.io/v1
+                kind: APIServer
+                metadata:
+                  name: cluster
+                spec:
+                  encryption:
+                    type: aescbc
+          remediationAction: enforce
+          severity: low
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: enable-etcd-encryption-status-kubeapi
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: KubeAPIServer
+                metadata:
+                  name: cluster
+                status:
+                  conditions:
+                    - message: 'All resources encrypted: secrets, configmaps'
+                      reason: EncryptionCompleted
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: policies.policy-autoscale-hypershift
+  name: policies.policy-autoscale-hypershift
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: enable-autoscale-hypershift
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: batch/v1
+                kind: CronJob
+                metadata:
+                  name: autoscale-down-hypershift-cronjob
+                  namespace: policies
+                spec:
+                  jobTemplate:
+                    spec:
+                      template:
+                        spec:
+                          containers:
+                            - command:
+                                - ./action
+                              env:
+                                - name: TAKE_ACTION
+                                  value: ScaleDown
+                                - name: OPT_IN
+                                  value: 'false'
+                              image: 'quay.io/acm-sre/autoscale-hypershift:2.5.0'
+                              imagePullPolicy: Always
+                              name: worker
+                          restartPolicy: OnFailure
+                          serviceAccountName: autoscale-hypershift
+                  schedule: 0 0 * * 6
+                  suspend: false
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: batch/v1beta1
+                kind: CronJob
+                metadata:
+                  name: autoscale-up-cronjob
+                  namespace: policies
+                spec:
+                  jobTemplate:
+                    spec:
+                      template:
+                        spec:
+                          containers:
+                            - command:
+                                - ./action
+                              env:
+                                - name: TAKE_ACTION
+                                  value: ScaleUp
+                                - name: OPT_IN
+                                  value: 'false'
+                              image: 'quay.io/acm-sre/autoscale-hypershift:2.5.0'
+                              imagePullPolicy: Always
+                              name: worker
+                          restartPolicy: OnFailure
+                          serviceAccountName: autoscale-hypershift
+                  schedule: 0 1 * * 1
+                  suspend: false
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRole
+                metadata:
+                  name: kcp-ns-cleanup
+                rules:
+                  - apiGroups:
+                      - cluster.open-cluster-management.io
+                    resources:
+                      - hypershiftdeployments
+                    verbs:
+                      - get
+                      - list
+                  - apiGroups:
+                      - ''
+                    resources:
+                      - secrets
+                    verbs:
+                      - get
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRoleBinding
+                metadata:
+                  name: kcp-ns-cleanup
+                  namespace: policies
+                roleRef:
+                  apiGroup: rbac.authorization.k8s.io
+                  kind: ClusterRole
+                  name: kcp-ns-cleanup
+                subjects:
+                  - kind: ServiceAccount
+                    name: kcp-ns-cleanup
+                    namespace: policies
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: kcp-ns-cleanup
+                  namespace: policies
+          remediationAction: enforce
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    open-cluster-management.io/policy-set: acm-hardening
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: policies.policy-check-backups
+  name: policies.policy-check-backups
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: policy-check-backups
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: cluster.open-cluster-management.io/v1beta1
+                kind: BackupSchedule
+                metadata:
+                  namespace: open-cluster-management-backup
+                status:
+                  phase: Enabled
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  labels:
+                    app: cluster-backup-chart
+                  namespace: open-cluster-management-backup
+                status:
+                  phase: Running
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  annotations:
+                    repository: 'https://github.com/openshift/oadp-operator'
+                  namespace: open-cluster-management-backup
+                status:
+                  phase: Running
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  labels:
+                    app.kubernetes.io/name: velero
+                  namespace: open-cluster-management-backup
+                status:
+                  phase: Running
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: velero.io/v1
+                kind: BackupStorageLocation
+                metadata:
+                  namespace: open-cluster-management-backup
+                status:
+                  phase: Available
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: velero.io/v1
+                kind: Backup
+                metadata:
+                  labels:
+                    velero.io/schedule-name: acm-validation-policy-schedule
+                  namespace: open-cluster-management-backup
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: velero.io/v1
+                kind: Backup
+                metadata:
+                  labels:
+                    velero.io/schedule-name: acm-managed-clusters-schedule
+                  namespace: open-cluster-management-backup
+                status:
+                  phase: Completed
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: velero.io/v1
+                kind: Backup
+                metadata:
+                  labels:
+                    velero.io/schedule-name: acm-resources-schedule
+                  namespace: open-cluster-management-backup
+                status:
+                  phase: Completed
+          remediationAction: inform
+          severity: medium
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CA Security Assessment and Authorization
+    policy.open-cluster-management.io/controls: CA-2 Security Assessments
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    open-cluster-management.io/policy-set: acm-hardening
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: policies.policy-check-policyreports
+  name: policies.policy-check-policyreports
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: policy-check-policyreports
+        spec:
+          namespaceSelector:
+            exclude:
+              - openshift*
+            include:
+              - '*'
+          object-templates:
+            - complianceType: mustnothave
+              objectDefinition:
+                apiVersion: wgpolicyk8s.io/v1alpha2
+                kind: PolicyReport
+                results:
+                  - result: fail
+          remediationAction: inform
+          severity: medium
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: policies.policy-kcp-empty-ns-cleanup
+  name: policies.policy-kcp-empty-ns-cleanup
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: enable-kcp-empty-ns-cleanup
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: batch/v1beta1
+                kind: CronJob
+                metadata:
+                  name: kcp-ns-cleanup-cronjob
+                  namespace: policies
+                spec:
+                  jobTemplate:
+                    spec:
+                      template:
+                        spec:
+                          containers:
+                            - command:
+                                - ./kcp-ns-cleanup
+                              image: 'quay.io/acm-sre/kcp-ns-cleanup:2.5.0'
+                              imagePullPolicy: Always
+                              name: worker
+                          restartPolicy: OnFailure
+                          serviceAccountName: kcp-ns-cleanup
+                  schedule: 0 23 * * 0-6
+                  suspend: false
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRole
+                metadata:
+                  name: kcp-ns-cleanup
+                rules:
+                  - apiGroups:
+                      - cluster.open-cluster-management.io
+                    resources:
+                      - hypershiftdeployments
+                    verbs:
+                      - get
+                      - list
+                  - apiGroups:
+                      - ''
+                    resources:
+                      - secrets
+                    verbs:
+                      - get
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRoleBinding
+                metadata:
+                  name: kcp-ns-cleanup
+                  namespace: policies
+                roleRef:
+                  apiGroup: rbac.authorization.k8s.io
+                  kind: ClusterRole
+                  name: kcp-ns-cleanup
+                subjects:
+                  - kind: ServiceAccount
+                    name: kcp-ns-cleanup
+                    namespace: policies
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: kcp-ns-cleanup
+                  namespace: policies
+          remediationAction: enforce
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: CA Security Assessment and Authorization
+    policy.open-cluster-management.io/controls: CA-7 Continuous Monitoring
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    open-cluster-management.io/policy-set: acm-hardening
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: policies.policy-managedclusteraddon-available
+  name: policies.policy-managedclusteraddon-available
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: policy-managedclusteraddon-available
+        spec:
+          namespaceSelector:
+            exclude:
+              - openshift*
+            include:
+              - '*'
+          object-templates:
+            - complianceType: mustnothave
+              objectDefinition:
+                apiVersion: addon.open-cluster-management.io/v1alpha1
+                kind: ManagedClusterAddOn
+                status:
+                  conditions:
+                    - status: 'False'
+                      type: Available
+          remediationAction: inform
+          severity: medium
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SI System and Information Integrity
+    policy.open-cluster-management.io/controls: SI-5 Security Alerts Advisories and Directives
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    open-cluster-management.io/policy-set: acm-hardening
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: policies.policy-subscriptions
+  name: policies.policy-subscriptions
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: policy-subscriptions
+        spec:
+          namespaceSelector:
+            exclude:
+              - openshift*
+            include:
+              - '*'
+          object-templates:
+            - complianceType: mustnothave
+              objectDefinition:
+                apiVersion: apps.open-cluster-management.io/v1
+                kind: Subscription
+                status:
+                  phase: Failed
+          remediationAction: inform
+          severity: medium
