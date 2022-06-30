@@ -1,0 +1,299 @@
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    policy.open-cluster-management.io/categories: PR.IP Information Protection Processes and Procedures
+    policy.open-cluster-management.io/controls: PR.IP-1 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST-CSF
+  labels:
+    app.kubernetes.io/instance: cert-manager
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: cert-manager.aws-clusterissuer-policy
+  name: cert-manager.aws-clusterissuer-policy
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: azure-cluster-issuer-conf-policy
+        spec:
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - cert-manager
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: cert-manager.io/v1
+                kind: ClusterIssuer
+                metadata:
+                  name: public-issuer
+                  namespace: cert-manager
+                spec:
+                  acme:
+                    email: acm-cicd@redhat.com
+                    privateKeySecretRef:
+                      name: letsencrypt-account-key
+                    server: 'https://acme-v02.api.letsencrypt.org/directory'
+                    solvers:
+                      - dns01:
+                          cnameStrategy: Follow
+                          route53:
+                            accessKeyID: >-
+                              {{fromSecret "cert-manager"
+                              "kcp-sgs-pipelines-secrets-config" "awsAccessKey"
+                              | base64dec}}
+                            hostedZoneID: >-
+                              {{ (lookup "config.openshift.io/v1" "DNS" ""
+                              "cluster").spec.publicZone.id }}
+                            region: us-east-1
+                            secretAccessKeySecretRef:
+                              key: awsSecretAccessKey
+                              name: kcp-sgs-pipelines-secrets-config
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    policy.open-cluster-management.io/categories: PR.IP Information Protection Processes and Procedures
+    policy.open-cluster-management.io/controls: PR.IP-1 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST-CSF
+  labels:
+    app.kubernetes.io/instance: cert-manager
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: cert-manager.cert-manager-csv-policy
+  name: cert-manager.cert-manager-csv-policy
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          annotations:
+            argocd.argoproj.io/sync-wave: '2'
+          name: cert-manager-csv-conf-policy
+        spec:
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - cert-manager
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: redhatcop.redhat.io/v1alpha1
+                kind: Patch
+                metadata:
+                  name: cert-manager-csv
+                  namespace: openshift-gitops
+                spec:
+                  patches:
+                    cert-manager-csv:
+                      patchTemplate: >-
+                        [{"op":"replace","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args","value":
+                        ["--v=2","--cluster-resource-namespace=$(POD_NAMESPACE)",
+                        "--leader-election-namespace=kube-system",
+                        "--dns01-recursive-nameservers-only",
+                        "--dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53"]}]
+                      patchType: application/json-patch+json
+                      targetObjectRef:
+                        apiVersion: operators.coreos.com/v1alpha1
+                        kind: ClusterServiceVersion
+                        name: >-
+                          {{ (lookup "operators.coreos.com/v1alpha1"
+                          "Subscription" "cert-manager"
+                          "cert-manager").status.currentCSV }}
+                        namespace: cert-manager
+                  serviceAccountRef:
+                    name: openshift-gitops-argocd-application-controller
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-8 Transmission Confidentiality and Integrity
+    policy.open-cluster-management.io/standards: NIST 800-53
+  labels:
+    app.kubernetes.io/instance: cert-manager
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: cert-manager.certification-expiration-policy
+  name: cert-manager.certification-expiration-policy
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: CertificatePolicy
+        metadata:
+          name: certification-expiration-check-policy
+        spec:
+          minimumDuration: 600h
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - openshift-ingress
+              - openshift-config
+          remediationAction: inform
+          severity: low
+  remediationAction: inform
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    policy.open-cluster-management.io/categories: PR.IP Information Protection Processes and Procedures
+    policy.open-cluster-management.io/controls: PR.IP-1 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST-CSF
+  labels:
+    app.kubernetes.io/instance: cert-manager
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: openshift-config.api-domain-tls-cert-creation-policy
+  name: openshift-config.api-domain-tls-cert-creation-policy
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: api-domain-tls-cert-creation-conf-policy
+        spec:
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - openshift-config
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: cert-manager.io/v1
+                kind: Certificate
+                metadata:
+                  annotations:
+                    argocd.argoproj.io/sync-wave: '4'
+                  labels:
+                    use-dns01-solver: 'true'
+                  name: api-domain-tls-cert
+                  namespace: openshift-config
+                spec:
+                  dnsNames:
+                    - >-
+                      api.{{ (lookup "config.openshift.io/v1" "DNS" ""
+                      "cluster").spec.baseDomain }}
+                  issuerRef:
+                    group: cert-manager.io
+                    kind: ClusterIssuer
+                    name: public-issuer
+                  privateKey:
+                    algorithm: RSA
+                    size: 2048
+                  secretName: api-domain-tls
+                  subject:
+                    organizations:
+                      - Advanced Cluster Management
+                  usages:
+                    - server auth
+                    - client auth
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    policy.open-cluster-management.io/categories: PR.IP Information Protection Processes and Procedures
+    policy.open-cluster-management.io/controls: PR.IP-1 Baseline Configuration
+    policy.open-cluster-management.io/standards: NIST-CSF
+  labels:
+    app.kubernetes.io/instance: cert-manager
+    policy.open-cluster-management.io/cluster-name: local-cluster
+    policy.open-cluster-management.io/cluster-namespace: local-cluster
+    policy.open-cluster-management.io/root-policy: openshift-ingress.apps-domain-tls-cert-policy
+  name: openshift-ingress.apps-domain-tls-cert-policy
+  namespace: local-cluster
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: apps-domain-tls-cert-conf-policy
+        spec:
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - openshift-ingress
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: cert-manager.io/v1
+                kind: Certificate
+                metadata:
+                  annotations:
+                    argocd.argoproj.io/sync-wave: '4'
+                  labels:
+                    use-dns01-solver: 'true'
+                  name: apps-domain-tls-cert
+                  namespace: openshift-ingress
+                spec:
+                  dnsNames:
+                    - >-
+                      apps.{{ (lookup "config.openshift.io/v1" "DNS" ""
+                      "cluster").spec.baseDomain }}
+                    - >-
+                      *.apps.{{ (lookup "config.openshift.io/v1" "DNS" ""
+                      "cluster").spec.baseDomain }}
+                  issuerRef:
+                    group: cert-manager.io
+                    kind: ClusterIssuer
+                    name: public-issuer
+                  privateKey:
+                    algorithm: RSA
+                    size: 2048
+                  secretName: apps-domain-tls
+                  subject:
+                    organizations:
+                      - Advanced Cluster Management
+                  usages:
+                    - server auth
+                    - client auth
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
