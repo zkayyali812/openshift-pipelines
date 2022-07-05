@@ -33,18 +33,29 @@ spec:
                 stringData:
                   alertmanager.yaml: |
                     global:
-                      slack_api_url: <DEFAULT_SLACK_API_URL>
+                      slack_api_url:  '{{fromSecret "open-cluster-management" "kcp-sgs-pipelines-secrets-config" "defaultSlackAPI" | base64dec }}'
 
                     route:
                       receiver: default-receiver
-                      group_by: ['alertname', 'cluster', 'pod']
-                      repeat_interval: 30m
+                      group_by: ['alertname', 'cluster', 'namespace']
+                      group_wait: 30s
+                      group_interval: 5m
+                      repeat_interval: 4h
                       routes:
+                        - receiver: mute-alerts
+                          matchers:
+                            - alertname =~ "AlertmanagerReceiversNotConfigured"
+                        - receiver: ignored-kube-state-metrics-alert
+                          matchers:
+                            # kube-state-metrics issue: https://issues.redhat.com/browse/AAP-4197
+                            - alertname = "KubeStateMetricsListErrors"
+                            - severity = "critical"
                         - receiver: default-receiver
                           matchers:
                             - severity =~ "warning|critical"
                           continue: true
                         - receiver: to-github
+                          group_by: ['...']
                           matchers:
                             - alertname =~ ".*"
                           continue: true
@@ -58,6 +69,10 @@ spec:
                             - team = "acm-sre"
 
                     receivers:
+                      # remove all ignored-xxx receiver when we fixed the alert issue
+                      - name: ignored-kube-state-metrics-alert
+                      - name: ignored-cert-manager-argo-alert
+                      - name: mute-alerts
                       - name: to-github
                         webhook_configs:
                         - url: "http://alertmanager-to-github.alertmanager-to-github/v1/webhook?owner=stolostron&repo=incident-backlog&labels=auto-created,kcp,dev"
@@ -72,7 +87,7 @@ spec:
                             - name: "links"
                               text: "Grafana :grafana:"
                               type: "button"
-                              url:  https://{{ (lookup "route.openshift.io/v1" "Route" "openshift-monitoring" "grafana").spec.host }}
+                              url: https://{{fromSecret "openshift-gitops" "console-url" "ACM_CONSOLE_URL" | base64dec}}{{`/grafana/explore?orgId=1&left=["now-1h","now","Observatorium",{"expr":"ALERTS{alertname=\"{{ .CommonLabels.alertname }}\",cluster=\"{{ .CommonLabels.cluster }}\"}","context":"explore"},{"mode":"Metrics"},{"ui":[true,true,true,"none"]}]`}}'
                           footer: |
                             "{{`{{ .CommonLabels.cluster }}`}}"
                           mrkdwn_in:
@@ -86,13 +101,13 @@ spec:
                               "{{`{{ range .Labels.SortedPairs }} • *{{ .Name }}:* {{ .Value }} {{ printf "\n" }} {{ end }}`}}"
                             "{{`{{ end }}`}}"
                           title: "{{`[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})`}}"
-                          title_link: https://{{ (lookup "route.openshift.io/v1" "Route" "open-cluster-management" "multicloud-console").spec.host }}
+                          title_link: http://{{fromSecret "openshift-gitops" "console-url" "ALERTMANAGER_URL" | base64dec}}/#/alerts
                       - name: 'pagerduty-acm-kcp-critical'
                         pagerduty_configs:
-                        - service_key: <PAGERDUTY_SERVICE_KEY>
+                        - service_key: '{{fromSecret "open-cluster-management" "kcp-sgs-pipelines-secrets-config" "pagerdutyServiceKey" | base64dec }}'
                       - name: 'pagerduty-acm-kcp-warning'
                         pagerduty_configs:
-                        - service_key: <PAGERDUTY_SERVICE_KEY>
+                        - service_key: '{{fromSecret "open-cluster-management" "kcp-sgs-pipelines-secrets-config" "pagerdutyServiceKey" | base64dec }}'
           remediationAction: inform
           severity: low
   remediationAction: enforce
