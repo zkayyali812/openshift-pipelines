@@ -71,20 +71,10 @@ spec:
     workspaces:
     - name: source
       workspace: shared-workspace
-  - name: deploy-observability
-    runAfter:
-    - ensure-acm
-    taskRef:
-      kind: Task
-      name: deploy-kcp-hub-deploy-observability
-    workspaces:
-    - name: source
-      workspace: shared-workspace
   - name: apply-argo-apps
     runAfter:
     - configure-idp
     - configure-hypershift
-    - deploy-observability
     taskRef:
       kind: Task
       name: deploy-kcp-hub-apply-argo
