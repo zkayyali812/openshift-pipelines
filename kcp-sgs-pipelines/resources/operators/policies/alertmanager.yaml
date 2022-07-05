@@ -71,7 +71,6 @@ spec:
                     receivers:
                       # remove all ignored-xxx receiver when we fixed the alert issue
                       - name: ignored-kube-state-metrics-alert
-                      - name: ignored-cert-manager-argo-alert
                       - name: mute-alerts
                       - name: to-github
                         webhook_configs:
@@ -102,10 +101,10 @@ spec:
                             "{{`{{ end }}`}}"
                           title: "{{`[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})`}}"
                           title_link: http://{{fromSecret "openshift-gitops" "console-url" "ALERTMANAGER_URL" | base64dec}}/#/alerts
-                      - name: 'pagerduty-acm-kcp-critical'
+                      - name: pagerduty-acm-kcp-critical
                         pagerduty_configs:
                         - service_key: '{{fromSecret "open-cluster-management" "kcp-sgs-pipelines-secrets-config" "pagerdutyServiceKey" | base64dec }}'
-                      - name: 'pagerduty-acm-kcp-warning'
+                      - name: pagerduty-acm-kcp-warning
                         pagerduty_configs:
                         - service_key: '{{fromSecret "open-cluster-management" "kcp-sgs-pipelines-secrets-config" "pagerdutyServiceKey" | base64dec }}'
           remediationAction: inform
