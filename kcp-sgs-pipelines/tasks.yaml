@@ -360,110 +360,6 @@ spec:
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: deploy-kcp-hub-deploy-observability
-spec:
-  steps:
-  - args:
-    - |-
-      #!/bin/bash
-      set -e
-
-      _AWS_BUCKET_NAME=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsBucketName' - | base64 -d)
-      _AWS_BUCKET_ENDPOINT=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsBucketEndpoint' - | base64 -d)
-      _AWS_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsAccessKey' - | base64 -d)
-      _AWS_SECRET_ACCESS_KEY=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.awsSecretAccessKey' - | base64 -d)
-
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
-
-      oc create namespace open-cluster-management-observability --dry-run=client -o yaml | oc apply -f -
-
-      _MCH_PULL_SECRET=$(oc get mch multiclusterhub -n open-cluster-management -o yaml | yq eval '.spec.imagePullSecret' -)
-      DOCKER_CONFIG_JSON=$(oc extract secret/${_MCH_PULL_SECRET} -n open-cluster-management --to=-)
-      oc create secret generic multiclusterhub-operator-pull-secret \
-      -n open-cluster-management-observability \
-      --from-literal=.dockerconfigjson="$DOCKER_CONFIG_JSON" \
-      --type=kubernetes.io/dockerconfigjson || true
-
-      yq eval '.stringData."thanos.yaml"' samples/kcp-sgs-pipelines/resources/observability_secret.yaml > thanos.yaml
-      BUCKET=${_AWS_BUCKET_NAME} yq eval -i '.config.bucket = env(BUCKET)' thanos.yaml
-      ENDPOINT=${_AWS_BUCKET_ENDPOINT} yq eval -i '.config.endpoint = env(ENDPOINT)' thanos.yaml
-      ACCESSKEY=${_AWS_ACCESS_KEY} yq eval -i '.config.access_key = env(ACCESSKEY)' thanos.yaml
-      SECRETKEY=${_AWS_SECRET_ACCESS_KEY} yq eval -i '.config.secret_key = env(SECRETKEY)' thanos.yaml
-
-      thanosYaml=$(cat thanos.yaml) yq eval -i '.stringData."thanos.yaml" = strenv(thanosYaml)' samples/kcp-sgs-pipelines/resources/observability_secret.yaml
-
-      oc apply -f samples/kcp-sgs-pipelines/resources/observability_secret.yaml
-
-      oc apply -f samples/kcp-sgs-pipelines/resources/multiclusterobservability.yaml
-
-      exit 0 
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    name: observability
-    resources: {}
-    workingDir: /workspace/source
-  - name: alertmanager-to-github
-    args:
-    - |-
-      #!/bin/bash
-      set -e
-
-      _GITHUB_TOKEN=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.githubToken' - | base64 -d)
-
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
-
-      TOKEN=${_GITHUB_TOKEN} yq eval -i '.stringData.ATG_GITHUB_TOKEN = env(TOKEN)' samples/kcp-sgs-pipelines/resources/alertmanager-to-github/secret.yaml
-
-      oc apply -k samples/kcp-sgs-pipelines/resources/alertmanager-to-github/
-
-      echo "Alertmanager to Github is deployed"
-
-      exit 0
-
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    resources: {}
-    workingDir: /workspace/source
-  - name: alertmanager
-    args:
-    - |-
-      #!/bin/bash
-      set -e
-
-      _defaultSlackAPI=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.defaultSlackAPI' - | base64 -d)
-      _pagerdutyServiceKey=$(oc get secret kcp-sgs-pipelines-secrets-config -o yaml | yq eval '.data.pagerdutyServiceKey' - | base64 -d)
-
-      _LOGIN_CMD=$(cat login.sh)
-      eval "$_LOGIN_CMD"
-
-      sed -i -e "s@<DEFAULT_SLACK_API_URL>@${_defaultSlackAPI}@g" samples/kcp-sgs-pipelines/resources/alertmanager.yaml
-      sed -i -e "s@<PAGERDUTY_SERVICE_KEY>@${_pagerdutyServiceKey}@g" samples/kcp-sgs-pipelines/resources/alertmanager.yaml
-
-      oc apply -f samples/kcp-sgs-pipelines/resources/alertmanager.yaml
-
-      echo "Alertmanager is deployed"
-
-      exit 0
-
-    command:
-    - /bin/bash
-    - -c
-    image: quay.io/acm-sre/ocm-utils:latest
-    resources: {}
-    workingDir: /workspace/source
-  workspaces:
-  - name: source
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
   name: deploy-kcp-hub-apply-argo
 spec:
   steps:
@@ -485,6 +381,7 @@ spec:
           _LOGIN_CMD=$(cat login.sh)
           eval "$_LOGIN_CMD"
 
+          echo "$_CONGIG_SECRET" | oc apply -f - -n open-cluster-management
           echo "Applying Policy prereqs"
           oc create namespace policies --dry-run=client -o yaml | oc apply -f -
 
@@ -518,8 +415,8 @@ spec:
           oc create namespace cert-manager --dry-run=client -o yaml | oc apply -f -
 
           echo "$_CONGIG_SECRET" | oc apply -f - -n cert-manager
-          echo "All prereqs applied"
 
+          echo "All prereqs applied"
           exit 0 
       command:
         - /bin/bash
@@ -540,7 +437,8 @@ spec:
           oc apply -f samples/kcp-sgs-pipelines/resources/argo/cluster-backup.yaml
           oc apply -f samples/kcp-sgs-pipelines/resources/argo/patch-operator.yaml
           oc apply -f samples/kcp-sgs-pipelines/resources/argo/cert-manager.yaml
-
+          oc apply -f samples/kcp-sgs-pipelines/resources/argo/alertmanager-to-github.yaml
+          oc apply -f samples/kcp-sgs-pipelines/resources/argo/observability.yaml
           echo "Argo apps applied"
           exit 0
       command:
