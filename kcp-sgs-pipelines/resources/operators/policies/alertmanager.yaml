@@ -34,7 +34,6 @@ spec:
                   alertmanager.yaml: |
                     global:
                       slack_api_url:  '{{fromSecret "open-cluster-management" "kcp-sgs-pipelines-secrets-config" "defaultSlackAPI" | base64dec }}'
-
                     route:
                       receiver: default-receiver
                       group_by: ['alertname', 'cluster', 'namespace']
@@ -86,7 +85,7 @@ spec:
                             - name: "links"
                               text: "Grafana :grafana:"
                               type: "button"
-                              url: https://{{fromSecret "openshift-gitops" "console-url" "ACM_CONSOLE_URL" | base64dec}}{{`/grafana/explore?orgId=1&left=["now-1h","now","Observatorium",{"expr":"ALERTS{alertname=\"{{ .CommonLabels.alertname }}\",cluster=\"{{ .CommonLabels.cluster }}\"}","context":"explore"},{"mode":"Metrics"},{"ui":[true,true,true,"none"]}]`}}'
+                              url: https://{{ (lookup "route.openshift.io/v1" "Route" "open-cluster-management" "multicloud-console").spec.host }}{{`/grafana/explore?orgId=1&left=["now-1h","now","Observatorium",{"expr":"ALERTS{alertname=\"{{ .CommonLabels.alertname }}\",cluster=\"{{ .CommonLabels.cluster }}\"}","context":"explore"},{"mode":"Metrics"},{"ui":[true,true,true,"none"]}]`}}'
                           footer: |
                             "{{`{{ .CommonLabels.cluster }}`}}"
                           mrkdwn_in:
@@ -100,7 +99,7 @@ spec:
                               "{{`{{ range .Labels.SortedPairs }} • *{{ .Name }}:* {{ .Value }} {{ printf "\n" }} {{ end }}`}}"
                             "{{`{{ end }}`}}"
                           title: "{{`[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})`}}"
-                          title_link: http://{{fromSecret "openshift-gitops" "console-url" "ALERTMANAGER_URL" | base64dec}}/#/alerts
+                          title_link: https://{{ (lookup "route.openshift.io/v1" "Route" "open-cluster-management" "multicloud-console").spec.host }}
                       - name: pagerduty-acm-kcp-critical
                         pagerduty_configs:
                         - service_key: '{{fromSecret "open-cluster-management" "kcp-sgs-pipelines-secrets-config" "pagerdutyServiceKey" | base64dec }}'
