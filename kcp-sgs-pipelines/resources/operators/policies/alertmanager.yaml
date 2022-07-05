@@ -81,11 +81,11 @@ spec:
                             - name: "links"
                               text: "ACM"
                               type: "button"
-                              url:  https://{{ (lookup "route.openshift.io/v1" "Route" "open-cluster-management" "multicloud-console").spec.host }}
+                              url: https://{{ (lookup "route.openshift.io/v1" "Route" "open-cluster-management" "multicloud-console").spec.host }}
                             - name: "links"
                               text: "Grafana :grafana:"
                               type: "button"
-                              url: https://{{ (lookup "route.openshift.io/v1" "Route" "open-cluster-management" "multicloud-console").spec.host }}{{`/grafana/explore?orgId=1&left=["now-1h","now","Observatorium",{"expr":"ALERTS{alertname=\"{{ .CommonLabels.alertname }}\",cluster=\"{{ .CommonLabels.cluster }}\"}","context":"explore"},{"mode":"Metrics"},{"ui":[true,true,true,"none"]}]`}}'
+                              url: https://{{ (lookup "route.openshift.io/v1" "Route" "open-cluster-management" "multicloud-console").spec.host }}
                           footer: |
                             "{{`{{ .CommonLabels.cluster }}`}}"
                           mrkdwn_in:
