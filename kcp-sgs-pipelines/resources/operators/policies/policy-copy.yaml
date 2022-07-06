@@ -109,7 +109,7 @@ spec:
                   suspend: false
             - complianceType: musthave
               objectDefinition:
-                apiVersion: batch/v1beta1
+                apiVersion: batch/v1
                 kind: CronJob
                 metadata:
                   name: autoscale-up-cronjob
@@ -353,7 +353,7 @@ spec:
           object-templates:
             - complianceType: musthave
               objectDefinition:
-                apiVersion: batch/v1beta1
+                apiVersion: batch/v1
                 kind: CronJob
                 metadata:
                   name: kcp-ns-cleanup-cronjob
