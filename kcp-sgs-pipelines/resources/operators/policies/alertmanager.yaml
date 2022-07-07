@@ -44,6 +44,11 @@ spec:
                         - receiver: mute-alerts
                           matchers:
                             - alertname =~ "AlertmanagerReceiversNotConfigured"
+                        - receiver: mute-alerts
+                          matchers:
+                            - alertname =~ "ClusterOperatorDown|ClusterOperatorDegraded"
+                            - name = "console"
+                            - namespace =~ "^local-cluster-.*"
                         - receiver: ignored-kube-state-metrics-alert
                           matchers:
                             # kube-state-metrics issue: https://issues.redhat.com/browse/AAP-4197
