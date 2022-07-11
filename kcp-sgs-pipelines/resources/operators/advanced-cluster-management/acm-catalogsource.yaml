@@ -7,7 +7,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   displayName: Advanced Cluster Management
-  image: quay.io/acm-d/acm-custom-registry:v2.5.0-RC6
+  image: quay.io/acm-d/acm-custom-registry:v2.5.1-RC1
   publisher: Red Hat
   sourceType: grpc
   updateStrategy:
