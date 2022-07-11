@@ -28,7 +28,7 @@ spec:
   - name: fetch-repo-samples
     params:
     - name: url
-      value: https://github.com/stolostron/openshift-pipelines.git
+      value: https://github.com/philipwu08/openshift-pipelines.git
     - name: revision
       value: main
     - name: deleteExisting
