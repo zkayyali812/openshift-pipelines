@@ -109,7 +109,7 @@ spec:
                   suspend: false
             - complianceType: musthave
               objectDefinition:
-                apiVersion: batch/v1beta1
+                apiVersion: batch/v1
                 kind: CronJob
                 metadata:
                   name: autoscale-up-cronjob
@@ -353,7 +353,7 @@ spec:
           object-templates:
             - complianceType: musthave
               objectDefinition:
-                apiVersion: batch/v1beta1
+                apiVersion: batch/v1
                 kind: CronJob
                 metadata:
                   name: kcp-ns-cleanup-cronjob
@@ -502,3 +502,180 @@ spec:
                   phase: Failed
           remediationAction: inform
           severity: medium
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    policy.open-cluster-management.io/cluster-name: aws-hd-kdxth
+    policy.open-cluster-management.io/cluster-namespace: aws-hd-kdxth
+    policy.open-cluster-management.io/root-policy: policies.policy-ensure-hd-console-disabled
+  name: policies.policy-ensure-hd-console-disabled
+  namespace: aws-hd-kdxth
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: disable-hd-console
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: Console
+                metadata:
+                  name: cluster
+                spec:
+                  logLevel: Normal
+                  managementState: Removed
+                  operatorLogLevel: Normal
+          remediationAction: enforce
+          severity: low
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ensure-hd-console-disabled
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: Console
+                metadata:
+                  name: cluster
+                spec:
+                  logLevel: Normal
+                  managementState: Removed
+                  operatorLogLevel: Normal
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    policy.open-cluster-management.io/cluster-name: azure-hd-s76wr
+    policy.open-cluster-management.io/cluster-namespace: azure-hd-s76wr
+    policy.open-cluster-management.io/root-policy: policies.policy-ensure-hd-console-disabled
+  name: policies.policy-ensure-hd-console-disabled
+  namespace: azure-hd-s76wr
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: disable-hd-console
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: Console
+                metadata:
+                  name: cluster
+                spec:
+                  logLevel: Normal
+                  managementState: Removed
+                  operatorLogLevel: Normal
+          remediationAction: enforce
+          severity: low
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ensure-hd-console-disabled
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: Console
+                metadata:
+                  name: cluster
+                spec:
+                  logLevel: Normal
+                  managementState: Removed
+                  operatorLogLevel: Normal
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
+
+---
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  annotations:
+    policy.open-cluster-management.io/categories: SC System and Communications Protection
+    policy.open-cluster-management.io/controls: SC-28 Protection Of Information At Rest
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+  labels:
+    app.kubernetes.io/instance: policies
+    policy.open-cluster-management.io/cluster-name: kcp-unstable-q45k2
+    policy.open-cluster-management.io/cluster-namespace: kcp-unstable-q45k2
+    policy.open-cluster-management.io/root-policy: policies.policy-ensure-hd-console-disabled
+  name: policies.policy-ensure-hd-console-disabled
+  namespace: kcp-unstable-q45k2
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: disable-hd-console
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: Console
+                metadata:
+                  name: cluster
+                spec:
+                  logLevel: Normal
+                  managementState: Removed
+                  operatorLogLevel: Normal
+          remediationAction: enforce
+          severity: low
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ensure-hd-console-disabled
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: Console
+                metadata:
+                  name: cluster
+                spec:
+                  logLevel: Normal
+                  managementState: Removed
+                  operatorLogLevel: Normal
+          remediationAction: inform
+          severity: low
+  remediationAction: enforce
