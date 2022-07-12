@@ -9,7 +9,7 @@ spec:
     description: The name of the clusterclaim to use
     type: string
   - name: clusterPoolName
-    default: policy-aas-hubs
+    default: hypershift-ci-cluster-pool
     description: The name of the clusterpool to use
     type: string
   - name: clusterClaimLifetime
