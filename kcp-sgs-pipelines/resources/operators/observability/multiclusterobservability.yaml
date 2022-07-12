@@ -3,6 +3,13 @@ kind: MultiClusterObservability
 metadata:
   name: observability
 spec:
+  advanced:
+    alertmanager:
+      replicas: 1
+      resources:
+        limits:
+          cpu: 100m
+          memory: 400Mi
   enableDownsampling: true
   observabilityAddonSpec:
     enableMetrics: true
