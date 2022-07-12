@@ -39,6 +39,42 @@ spec:
       spec:
         hostingCluster: $(inputs.params.targetManagedCluster)
         hostingNamespace: $(inputs.params.targetManagedCluster)
+        hostedClusterSpec:
+          imageContentSources:
+          - source: registry.redhat.io/rhacm2
+            mirrors:
+            - quay.io:443/acm-d
+          - source: registry.redhat.io/multicluster-engine
+            mirrors:
+            - quay.io:443/acm-d
+          - source: registry.access.redhat.com/openshift4/ose-oauth-proxy
+            mirrors:
+            - registry.redhat.io/openshift4/ose-oauth-proxy
+          networking:
+            machineCIDR: 10.0.0.0/16
+            networkType: OpenShiftSDN
+            podCIDR: 10.132.0.0/14
+            serviceCIDR: 172.31.0.0/16
+          platform:
+            type: AWS
+          pullSecret:
+            name: $(inputs.params.targetManagedCluster)-hd-pull-secret
+          release:
+            image: quay.io/openshift-release-dev/ocp-release:4.11.0-rc.1-x86_64
+          services:
+          - service: APIServer
+            servicePublishingStrategy:
+              type: LoadBalancer
+          - service: OAuthServer
+            servicePublishingStrategy:
+              type: Route
+          - service: Konnectivity
+            servicePublishingStrategy:
+              type: Route
+          - service: Ignition
+            servicePublishingStrategy:
+              type: Route
+          sshKey: {}
         infrastructure:
           cloudProvider:
             name: acm-credentials
