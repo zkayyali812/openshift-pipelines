@@ -7,7 +7,7 @@ spec:
   - name: clusterClaimName
     type: string
     description: The name of the clusterclaim to claim
-    default: "spoke-cluster"
+    default: "hs-cluster"
   tasks:
   - name: checkout-hub-cluster
     params:

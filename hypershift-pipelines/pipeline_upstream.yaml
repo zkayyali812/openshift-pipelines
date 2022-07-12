@@ -7,11 +7,11 @@ spec:
   - name: clusterPoolName
     type: string
     description: The name of the clusterpool to use
-    default: "hypershift-cluster-pool"
+    default: "hypershift-ci-cluster-pool"
   - name: clusterClaimName
     type: string
     description: The name of the clusterclaim to claim
-    default: "spoke-cluster"
+    default: "hs-cluster"
   - name: clusterClaimLifetime
     type: string
     description: The length of the lifetime of the clusterclaim. Default 8h
