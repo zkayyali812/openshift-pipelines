@@ -8,6 +8,7 @@ extractBundlesFromImage () {
     echo "== Extracting bundles from image ${_image} =="
     ${_DOCKER_OR_PODMAN} pull "$image"
     ${_DOCKER_OR_PODMAN} save "$image" --output temp.tar
+    file temp.tar
     mkdir -p temp
     tar -xf temp.tar -C temp/
 
