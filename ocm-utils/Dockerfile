@@ -1,6 +1,6 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-RUN microdnf update -y && microdnf install -y podman python39 python-pip tar gzip jq wget git make unzip
+RUN microdnf update -y && microdnf install -y file podman python39 python-pip tar gzip jq wget git make unzip
 
 RUN python3 -m pip install --upgrade pip
 
