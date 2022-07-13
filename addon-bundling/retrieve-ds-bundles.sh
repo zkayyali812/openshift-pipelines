@@ -9,7 +9,7 @@ extractBundlesFromImage () {
     ${_DOCKER_OR_PODMAN} pull "$image"
     ${_DOCKER_OR_PODMAN} save "$image" --output temp.tar
     mkdir -p temp
-    tar -xzf temp.tar -C temp/
+    tar -xf temp.tar -C temp/
 
     _bundleURI=(${_image//:/ })
     _bundleURL=${_bundleURI[0]}
