@@ -1,41 +1,45 @@
 bundles:
-- addonChannel: stable
-  image: quay.io/acm-d/acm-operator-bundle:v2.4.0-164
+# - addonChannel: stable
+#   image: quay.io/acm-d/acm-operator-bundle:v2.4.0-164
+#   operator: advanced-cluster-management
+#   version: 2.4.0
+# - addonChannel: stable
+#   image: quay.io/acm-d/acm-operator-bundle:v2.4.1-18
+#   operator: advanced-cluster-management
+#   version: 2.4.1
+# - addonChannel: stable
+#   image: quay.io/acm-d/acm-operator-bundle:v2.4.2-82
+#   operator: advanced-cluster-management
+#   version: 2.4.2
+# - addonChannel: beta
+#   image: quay.io/acm-d/acm-operator-bundle:v2.5.0-304
+#   operator: advanced-cluster-management
+#   version: 2.5.0
+# - addonChannel: beta
+#   image: quay.io/acm-d/acm-operator-bundle:v2.5.1-13
+#   operator: advanced-cluster-management
+#   version: 2.5.1
+- addonChannel: beta
+  image: quay.io/acm-d/acm-operator-bundle:v2.5.2-4
   operator: advanced-cluster-management
-  version: 2.4.0
-- addonChannel: stable
-  image: quay.io/acm-d/acm-operator-bundle:v2.4.1-18
-  operator: advanced-cluster-management
-  version: 2.4.1
-- addonChannel: stable
-  image: quay.io/acm-d/acm-operator-bundle:v2.4.2-82
-  operator: advanced-cluster-management
-  version: 2.4.2
-- addonChannel: beta
-  image: quay.io/acm-d/acm-operator-bundle:v2.5.0-304
-  operator: advanced-cluster-management
-  version: 2.5.0
-- addonChannel: beta
-  image: quay.io/acm-d/acm-operator-bundle:v2.5.1-13
-  operator: advanced-cluster-management
-  version: 2.5.1
-- addonChannel: beta
-  image: quay.io/acm-d/mce-operator-bundle:v2.0.0-150
-  operator: multicluster-engine
-  parent: advanced-cluster-management
-  version: 2.0.0
-- addonChannel: beta
-  image: quay.io/acm-d/mce-operator-bundle:v2.0.1-17
-  operator: multicluster-engine
-  parent: advanced-cluster-management
-  version: 2.0.1
-- addonChannel: beta
-  csvNameOverride: klusterlet-product
-  image: quay.io/acm-d/klusterlet-operator-bundle:v2.0.0-110
-  operator: klusterlet-operator
-  version: 2.0.0
-- addonChannel: beta
-  csvNameOverride: klusterlet-product
-  image: quay.io/acm-d/klusterlet-operator-bundle:v2.0.1-11
-  operator: klusterlet-operator
-  version: 2.0.1
+  version: 2.5.2
+# - addonChannel: beta
+#   image: quay.io/acm-d/mce-operator-bundle:v2.0.0-150
+#   operator: multicluster-engine
+#   parent: advanced-cluster-management
+#   version: 2.0.0
+# - addonChannel: beta
+#   image: quay.io/acm-d/mce-operator-bundle:v2.0.1-17
+#   operator: multicluster-engine
+#   parent: advanced-cluster-management
+#   version: 2.0.1
+# - addonChannel: beta
+#   csvNameOverride: klusterlet-product
+#   image: quay.io/acm-d/klusterlet-operator-bundle:v2.0.0-110
+#   operator: klusterlet-operator
+#   version: 2.0.0
+# - addonChannel: beta
+#   csvNameOverride: klusterlet-product
+#   image: quay.io/acm-d/klusterlet-operator-bundle:v2.0.1-11
+#   operator: klusterlet-operator
+#   version: 2.0.1
