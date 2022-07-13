@@ -8,10 +8,8 @@ extractBundlesFromImage () {
     echo "== Extracting bundles from image ${_image} =="
     ${_DOCKER_OR_PODMAN} pull "$image"
     ${_DOCKER_OR_PODMAN} save "$image" --output temp.tar
-    file temp.tar
-    ls -la
     mkdir -p temp
-    tar -xvf temp.tar -C temp/
+    tar -xf temp.tar -C temp/
 
     _bundleURI=(${_image//:/ })
     _bundleURL=${_bundleURI[0]}
@@ -21,7 +19,7 @@ extractBundlesFromImage () {
     
     mkdir -p temp/${_bundleDir}/extractedLayer
     _extractedBundle=temp/${_bundleDir}/extractedLayer
-    tar -xzf temp/${_bundleDir}/layer.tar -C ${_extractedBundle} 
+    tar -xf temp/${_bundleDir}/layer.tar -C ${_extractedBundle} 
 
     echo "Image contents extracted. Copying bundle contents to results directory"
     
