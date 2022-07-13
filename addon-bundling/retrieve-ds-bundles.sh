@@ -6,8 +6,8 @@ extractBundlesFromImage () {
     _resultsDir=$2
 
     echo "== Extracting bundles from image ${_image} =="
-    docker pull "$image"
-    docker save "$image" --output temp.tar
+    ${_DOCKER_OR_PODMAN} pull "$image"
+    ${_DOCKER_OR_PODMAN} save "$image" --output temp.tar
     mkdir -p temp
     tar -xzf temp.tar -C temp/
 
@@ -47,6 +47,13 @@ fixCSVs () {
     _csvName=$2
     yq eval -i 'del(.spec.customresourcedefinitions.owned.[].group)' ${_resultsDir}/manifests/${_csvName}
 }
+
+
+_DOCKER_OR_PODMAN=podman
+if ! command -v ${_DOCKER_OR_PODMAN} &> /dev/null
+then
+    _DOCKER_OR_PODMAN=docker
+fi
 
 rm -rf bundles/*
 
