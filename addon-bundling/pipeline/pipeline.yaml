@@ -1,0 +1,69 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: submit-osd-addon-update
+  namespace: osd-addon-bundling
+spec:
+  tasks:
+  - name: fetch-repository
+    params:
+    - name: url
+      value: https://github.com/stolostron/openshift-pipelines.git
+    - name: revision
+      value: main
+    - name: deleteExisting
+      value: "true"
+    - name: subdirectory
+      value: "samples"
+    - name: gitInitImage
+      value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:afc5d3f9efe26c7042635d43b8ffd09d67936e3d0b6b901dc08a33e20313d361
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+  - name: fetch-managed-tenants-bundles
+    params:
+    - name: url
+      value: https://gitlab.cee.redhat.com/zkayyali/managed-tenants-bundles.git
+    - name: revision
+      value: main
+    - name: deleteExisting
+      value: "true"
+    - name: sslVerify
+      value: "false"
+    - name: subdirectory
+      value: "managed-tenants-bundles"
+    - name: gitInitImage
+      value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:afc5d3f9efe26c7042635d43b8ffd09d67936e3d0b6b901dc08a33e20313d361
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+  - name: generate-bundles
+    runAfter:
+    - fetch-repository
+    taskRef:
+      kind: Task
+      name: generate-osd-addon-bundles
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  - name: create-merge-request
+    params:
+      - name: upstream_repo
+        value: https://gitlab.cee.redhat.com/service/managed-tenants-bundles.git
+    runAfter:
+    - fetch-managed-tenants-bundles
+    - generate-bundles
+    taskRef:
+      kind: Task
+      name: create-gitlab-merge-request
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+  workspaces:
+  - name: shared-workspace

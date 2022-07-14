@@ -1,0 +1,97 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: generate-osd-addon-bundles
+  namespace: osd-addon-bundling
+spec:
+  steps:
+  - name: generate-bundles
+    args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      echo "Fixing Podman permissions"
+      sed -i '/#mount_program = \"\/usr\/bin\/fuse-overlayfs\"/ s/^#//' /etc/containers/storage.conf
+
+      _QUAY_USER=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.quayUser' - | base64 -d)
+      _QUAY_TOKEN=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.quayToken' - | base64 -d)
+
+      echo "Logging into 'quay.io/acm-d'"
+      podman login quay.io/acm-d -u ${_QUAY_USER} -p ${_QUAY_TOKEN}
+      echo "Attempting generation of OSD Addon Bundles"
+      cd samples/addon-bundling/
+      make bundles
+      
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source
+
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-gitlab-merge-request
+  namespace: osd-addon-bundling
+spec:
+  params:
+  - name: upstream_repo
+    description: The upstream repository to merge the changes into.
+    default: https://gitlab.cee.redhat.com/service/managed-tenants-bundles.git
+    type: string
+  steps:
+  - name: create-gitlab-branch
+    args:
+    - |-
+      #!/bin/bash
+      set -e
+
+      _GITLAB_EMAIL=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.gitlabEmail' - | base64 -d)
+      _GITLAB_NAME=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.gitlabName' - | base64 -d)
+      _GITLAB_TOKEN_NAME=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.gitlabTokenName' - | base64 -d)
+      _GITLAB_TOKEN=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.gitlabToken' - | base64 -d)
+
+      cd managed-tenants-bundles/
+
+      echo "Updating Git Config"
+      git config --global user.email ${_GITLAB_EMAIL}
+      git config --global user.name ${_GITLAB_NAME}
+      git remote set-url origin https://${_GITLAB_TOKEN_NAME}:${_GITLAB_TOKEN}@gitlab.cee.redhat.com/zkayyali/managed-tenants-bundles 
+
+      echo "Update origin 'main' branch to latest upstream 'main' branch"
+      git remote add upstream $(inputs.params.upstream_repo)
+      git fetch
+      git switch -c main --track origin/main
+      git pull upstream main
+      git reset --hard upstream/main
+      git push --force origin main
+
+      echo "Checking out branch 'update-acm-bundles'"
+      git checkout -b update-acm-bundles
+
+      cp -r ../samples/addon-bundling/bundles/* addons/
+      git add addons/*
+      git status
+
+      git commit -m "Update ACM Bundles" -m "Updating ACM bundles from the ACM Addon Bundling Pipeline"
+      git push -o merge_request.create -o merge_request.title="Update ACM Bundles" \
+      -o merge_request.description="Updating ACM bundles from the ACM Addon Bundling Pipeline" \
+      -o merge_request.target=main -o merge_request.assign=zkayyali origin update-acm-bundles --force
+
+      echo "Merge Request Created"
+      exit 0
+    command:
+    - /bin/bash
+    - -c
+    image: quay.io/acm-sre/ocm-utils:latest
+    resources: {}
+    workingDir: /workspace/source
+  workspaces:
+  - name: source

@@ -2,6 +2,7 @@ bundles:
 - addonChannel: stable
   image: quay.io/acm-d/acm-operator-bundle:v2.4.0-164
   operator: advanced-cluster-management
+  autoUpdate: false
   version: 2.4.0
 - addonChannel: stable
   image: quay.io/acm-d/acm-operator-bundle:v2.4.1-18

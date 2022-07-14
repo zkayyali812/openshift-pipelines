@@ -53,6 +53,9 @@ def main():
     stream = open(configYaml, 'r')
     bundleConfig = yaml.safe_load(stream)
     for bundle in bundleConfig['bundles']:
+        if "autoUpdate" in bundle and bundle["autoUpdate"] == False:
+            print("Skipping update of bundle {bundle} version {version} because autoUpdate is set to false.".format(bundle = bundle['operator'], version = bundle['version']))
+            continue
         tag = getLatestTagOfBundleByVersion(bundle)
         if tag == "UNKNOWN":
             continue
