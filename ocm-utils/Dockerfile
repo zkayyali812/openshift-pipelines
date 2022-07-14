@@ -6,6 +6,11 @@ RUN python3 -m pip install --upgrade pip
 
 RUN python3 -m pip install ansible
 
+# Install github 'hub' CLI
+RUN curl -sLO https://github.com/github/hub/releases/download/v2.14.2/hub-linux-amd64-2.14.2.tgz -o hub-linux-amd64-2.14.2.tgz && \
+    tar xzf hub-linux-amd64-2.14.2.tgz && chmod +x hub-linux-amd64-2.14.2/bin/hub && mv hub-linux-amd64-2.14.2/bin/hub /usr/local/bin/hub && \
+    rm hub-linux-amd64-2.14.2.tgz
+
 # Install oc/kubectl
 RUN curl -sLO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz -o openshift-client-linux.tar.gz && \
     tar xzf openshift-client-linux.tar.gz && chmod +x oc && mv oc /usr/local/bin/oc && \
