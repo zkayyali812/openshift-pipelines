@@ -12,6 +12,22 @@ bundles:
   image: quay.io/acm-d/acm-operator-bundle:v2.4.2-82
   operator: advanced-cluster-management
   version: 2.4.2
+- addonChannel: stable
+  image: quay.io/acm-d/acm-operator-bundle:v2.4.3-36
+  operator: advanced-cluster-management
+  version: 2.4.3
+- addonChannel: stable
+  image: quay.io/acm-d/acm-operator-bundle:v2.4.4-9
+  operator: advanced-cluster-management
+  version: 2.4.4
+- addonChannel: stable
+  image: quay.io/acm-d/acm-operator-bundle:v2.4.5-47
+  operator: advanced-cluster-management
+  version: 2.4.5
+- addonChannel: stable
+  image: quay.io/acm-d/acm-operator-bundle:v2.4.6-16
+  operator: advanced-cluster-management
+  version: 2.4.6
 - addonChannel: beta
   image: quay.io/acm-d/acm-operator-bundle:v2.5.0-304
   operator: advanced-cluster-management
@@ -20,6 +36,10 @@ bundles:
   image: quay.io/acm-d/acm-operator-bundle:v2.5.1-13
   operator: advanced-cluster-management
   version: 2.5.1
+- addonChannel: beta
+  image: quay.io/acm-d/acm-operator-bundle:v2.5.2-6
+  operator: advanced-cluster-management
+  version: 2.5.2
 - addonChannel: beta
   image: quay.io/acm-d/mce-operator-bundle:v2.0.0-150
   operator: multicluster-engine
@@ -30,6 +50,11 @@ bundles:
   operator: multicluster-engine
   parent: advanced-cluster-management
   version: 2.0.1
+- addonChannel: beta
+  image: quay.io/acm-d/mce-operator-bundle:v2.0.2-1
+  operator: multicluster-engine
+  parent: advanced-cluster-management
+  version: 2.0.2
 - addonChannel: beta
   csvNameOverride: klusterlet-product
   image: quay.io/acm-d/klusterlet-operator-bundle:v2.0.0-110
