@@ -1,0 +1,91 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: osd-addon-trigger-cron
+spec:
+  schedule: "0 0 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: hello
+            image: curlimages/curl
+            args: ["curl", "-X", "POST", "--data", "{}", "el-osd-addon-cron-listener.osd-addon-bundling.svc.cluster.local:8080"]
+          restartPolicy: Never
+
+---
+
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: osd-addon-cron-listener
+spec:
+  serviceAccountName: tekton-triggers-example-sa
+  triggers:
+    - name: osd-cron-trig
+      bindings:
+      - ref: osd-addon-cron-binding
+      template:
+        ref: osd-addon-pipeline-template
+
+---
+
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: osd-addon-cron-binding
+spec: {}
+
+---
+
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: osd-addon-pipeline-template
+  namespace: osd-addon-bundling
+spec:
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: submit-osd-addon-update-
+    spec:
+      pipelineRef:
+        name: submit-osd-addon-update
+      workspaces:
+      - name: shared-workspace
+        persistentVolumeClaim:
+          claimName: osd-addons-pvc
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-triggers-example-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: triggers-example-eventlistener-binding
+subjects:
+- kind: ServiceAccount
+  name: tekton-triggers-example-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-roles
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: triggers-example-eventlistener-clusterbinding
+subjects:
+- kind: ServiceAccount
+  name: tekton-triggers-example-sa
+  namespace: osd-addon-bundling
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-clusterroles
