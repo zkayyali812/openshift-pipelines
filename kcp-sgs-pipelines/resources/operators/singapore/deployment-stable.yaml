@@ -20,7 +20,7 @@ spec:
       serviceAccountName: kcp-ocm-integration-controller-sa
       containers:
       - name: kcp-ocm-integration-controller
-        image: quay.io/stolostron/singapore:2.6.0-0fcaa0000d9953886a7ea1968c2ab65646eb2a39
+        image: quay.io/stolostron/singapore:2.6.0-40cbf5937097204a7cf5f12817cda0b84a48f7cb
         args:
           - "/kcp-ocm"
           - "manager"
@@ -29,7 +29,7 @@ spec:
           - "-v=4"
         env:
           - name: KCP_SYNCER_IMAGE
-            value: ghcr.io/kcp-dev/kcp/syncer:release-0.5
+            value: ghcr.io/kcp-dev/kcp/syncer:v0.6.1
         volumeMounts:
         - name: kcp-admin-kubeconfig
           mountPath: "/var/kcp-ocm/kcp"
