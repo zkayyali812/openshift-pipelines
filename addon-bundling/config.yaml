@@ -25,7 +25,7 @@ bundles:
   operator: advanced-cluster-management
   version: 2.4.5
 - addonChannel: stable
-  image: quay.io/acm-d/acm-operator-bundle:v2.4.6-16
+  image: quay.io/acm-d/acm-operator-bundle:v2.4.6-17
   operator: advanced-cluster-management
   version: 2.4.6
 - addonChannel: beta
@@ -37,7 +37,7 @@ bundles:
   operator: advanced-cluster-management
   version: 2.5.1
 - addonChannel: beta
-  image: quay.io/acm-d/acm-operator-bundle:v2.5.2-8
+  image: quay.io/acm-d/acm-operator-bundle:v2.5.2-10
   operator: advanced-cluster-management
   version: 2.5.2
 - addonChannel: beta
@@ -51,7 +51,7 @@ bundles:
   parent: advanced-cluster-management
   version: 2.0.1
 - addonChannel: beta
-  image: quay.io/acm-d/mce-operator-bundle:v2.0.2-6
+  image: quay.io/acm-d/mce-operator-bundle:v2.0.2-7
   operator: multicluster-engine
   parent: advanced-cluster-management
   version: 2.0.2
