@@ -1,0 +1,60 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterPool
+metadata:
+  labels:
+    cluster.open-cluster-management.io/clusterset: <clusterset-name>
+  name: kcp-sgs-hubs
+spec:
+  baseDomain: <aws-base-domain>
+  imageSetRef:
+    name: img4.10.21-x86-64-appsub # 'oc get clusterimageset' for more options
+  installConfigSecretTemplateRef:
+    name: install-config-secret # Sample install-config-secret attached below
+  platform:
+    aws:
+      credentialsSecretRef:
+        name: <aws-creds-secret-name>
+      region: us-east-1 # AWS Region. The region must match in the install-config-secret
+  pullSecretRef:
+    name: <OCP Pull Secret> # OCP Pull Secret
+  size: 0 # 0 means it will create cluster on demand, rather than maintaing hibernated clusters
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: install-config-secret
+stringData:
+  install-config.yaml: >-
+    apiVersion: v1
+    metadata:
+      name:
+    baseDomain:
+    controlPlane:
+      hyperthreading: Enabled
+      name: master
+      replicas: 3
+      platform:
+        aws:
+          type: m6a.2xlarge
+    compute:
+      - hyperthreading: Enabled
+        name: worker
+        replicas: 3
+        platform:
+          aws:
+            type: m6a.2xlarge
+    networking:
+      clusterNetwork:
+        - cidr: 10.128.0.0/14
+          hostPrefix: 23
+      machineCIDR: 10.0.0.0/16
+      networkType: OVNKubernetes
+      serviceNetwork:
+        - 172.30.0.0/16
+    platform:
+      aws:
+        region: us-east-1
+    pullSecret: ""
+type: Opaque
