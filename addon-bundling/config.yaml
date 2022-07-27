@@ -25,7 +25,7 @@ bundles:
   operator: advanced-cluster-management
   version: 2.4.5
 - addonChannel: stable
-  image: quay.io/acm-d/acm-operator-bundle:v2.4.6-19
+  image: quay.io/acm-d/acm-operator-bundle:v2.4.6-20
   operator: advanced-cluster-management
   version: 2.4.6
 - addonChannel: beta
