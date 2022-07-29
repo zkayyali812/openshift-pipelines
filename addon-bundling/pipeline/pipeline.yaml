@@ -56,6 +56,8 @@ spec:
     params:
       - name: upstream_repo
         value: https://gitlab.cee.redhat.com/service/managed-tenants-bundles.git
+      - name: fork
+        value: gitlab.cee.redhat.com/zkayyali/managed-tenants-bundles
     runAfter:
     - fetch-managed-tenants-bundles
     - generate-bundles

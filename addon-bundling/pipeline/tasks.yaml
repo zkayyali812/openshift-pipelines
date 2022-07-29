@@ -46,6 +46,10 @@ spec:
     description: The upstream repository to merge the changes into.
     default: https://gitlab.cee.redhat.com/service/managed-tenants-bundles.git
     type: string
+  - name: fork
+    description: The fork repo for the merge request.
+    default: gitlab.cee.redhat.com/service/managed-tenants-bundles
+    type: string
   steps:
   - name: create-gitlab-branch
     args:
@@ -57,13 +61,14 @@ spec:
       _GITLAB_NAME=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.gitlabName' - | base64 -d)
       _GITLAB_TOKEN_NAME=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.gitlabTokenName' - | base64 -d)
       _GITLAB_TOKEN=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.gitlabToken' - | base64 -d)
+      _GITLAB_USERS_TO_TAG=$(oc get secret addon-bundling-secrets-config -o yaml | yq eval '.data.usersToTagInMR' - | base64 -d)
 
       cd managed-tenants-bundles/
 
       echo "Updating Git Config"
       git config --global user.email ${_GITLAB_EMAIL}
       git config --global user.name ${_GITLAB_NAME}
-      git remote set-url origin https://${_GITLAB_TOKEN_NAME}:${_GITLAB_TOKEN}@gitlab.cee.redhat.com/zkayyali/managed-tenants-bundles 
+      git remote set-url origin https://${_GITLAB_TOKEN_NAME}:${_GITLAB_TOKEN}@$(inputs.params.fork)
 
       echo "Update origin 'main' branch to latest upstream 'main' branch"
       git remote add upstream $(inputs.params.upstream_repo)
@@ -83,7 +88,7 @@ spec:
       git commit -m "Update ACM Bundles" -m "Updating ACM bundles from the ACM Addon Bundling Pipeline"
       git push -o merge_request.create -o merge_request.title="Update ACM Bundles" \
       -o merge_request.description="Updating ACM bundles from the ACM Addon Bundling Pipeline" \
-      -o merge_request.target=main -o merge_request.assign=zkayyali origin update-acm-bundles --force
+      -o merge_request.target=main -o merge_request.assign=${_GITLAB_USERS_TO_TAG} origin update-acm-bundles --force
 
       echo "Merge Request Created"
       exit 0
